@@ -23,6 +23,16 @@ const envVarsSchema = Joi.object()
     SMTP_USERNAME: Joi.string().description('username for email server'),
     SMTP_PASSWORD: Joi.string().description('password for email server'),
     EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
+    GOOGLE_CLIENT_EMAIL: Joi.string().required().description('Google Calendar service account email'),
+    GOOGLE_PRIVATE_KEY: Joi.string().required().description('Google Calendar service account private key'),
+    GOOGLE_CALENDAR_ID: Joi.string().required().description('Google Calendar ID'),
+    TWILIO_ACCOUNT_SID: Joi.string().required().description('Twilio Account SID'),
+    TWILIO_AUTH_TOKEN: Joi.string().required().description('Twilio Auth Token'),
+    TWILIO_PHONE_NUMBER: Joi.string().required().description('Twilio Phone Number'),
+    STRIPE_SECRET_KEY: Joi.string().required().description('Stripe Secret Key'),
+    STRIPE_WEBHOOK_SECRET: Joi.string().required().description('Stripe Webhook Secret'),
+    CLIENT_URL: Joi.string().required().description('Client URL'),
+    SUPPORT_PHONE: Joi.string().required().description('Support Phone Number'),
   })
   .unknown();
 
@@ -61,4 +71,20 @@ module.exports = {
     },
     from: envVars.EMAIL_FROM,
   },
+  google: {
+    clientEmail: envVars.GOOGLE_CLIENT_EMAIL,
+    privateKey: envVars.GOOGLE_PRIVATE_KEY,
+    calendarId: envVars.GOOGLE_CALENDAR_ID,
+  },
+  twilio: {
+    accountSid: envVars.TWILIO_ACCOUNT_SID,
+    authToken: envVars.TWILIO_AUTH_TOKEN,
+    phoneNumber: envVars.TWILIO_PHONE_NUMBER,
+  },
+  stripe: {
+    secretKey: envVars.STRIPE_SECRET_KEY,
+    webhookSecret: envVars.STRIPE_WEBHOOK_SECRET,
+  },
+  clientUrl: envVars.CLIENT_URL,
+  supportPhone: envVars.SUPPORT_PHONE,
 };

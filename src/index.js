@@ -4,13 +4,16 @@ const config = require('./config/config');
 const logger = require('./config/logger');
 
 let server;
+
+// Connect to MongoDB
 mongoose.connect(config.mongoose.url, config.mongoose.options).then(() => {
   logger.info('Connected to MongoDB');
   server = app.listen(config.port, () => {
-    logger.info(`Listening to port ${config.port}`);
+    logger.info(`Server listening on port ${config.port}`);
   });
 });
 
+// Error handling for unexpected errors
 const exitHandler = () => {
   if (server) {
     server.close(() => {
@@ -36,3 +39,5 @@ process.on('SIGTERM', () => {
     server.close();
   }
 });
+
+module.exports = server;

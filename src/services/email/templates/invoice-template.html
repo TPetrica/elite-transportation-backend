@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Invoice</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .invoice-header {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .details {
+        margin-bottom: 20px;
+      }
+      .amount {
+        font-size: 24px;
+        color: #28a745;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-header">
+      <h1>LUXRIDE Invoice #{{invoiceNumber}}</h1>
+      <p>Date: {{invoiceDate}}</p>
+    </div>
+
+    <div class="details">
+      <h2>Service Details</h2>
+      <p><strong>From:</strong> {{pickup}}</p>
+      <p><strong>To:</strong> {{dropoff}}</p>
+    </div>
+
+    <div class="details">
+      <h2>Customer Details</h2>
+      <p><strong>Name:</strong> {{customer.name}}</p>
+      <p><strong>Address:</strong> {{customer.address}}</p>
+      <p><strong>City:</strong> {{customer.city}}</p>
+      <p><strong>Country:</strong> {{customer.country}}</p>
+    </div>
+
+    <div class="details">
+      <h2>Amount</h2>
+      <p class="amount">${{amount}}</p>
+    </div>
+
+    <div class="details">
+      <h2>Contact Us</h2>
+      <p>{{supplier.name}}</p>
+      <p>Email: {{supplier.email}}</p>
+      <p>Phone: {{supplier.phone}}</p>
+    </div>
+  </body>
+</html>

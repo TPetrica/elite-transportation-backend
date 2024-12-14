@@ -39,15 +39,30 @@ const logout = async (refreshToken) => {
  */
 const refreshAuth = async (refreshToken) => {
   try {
-    const refreshTokenDoc = await tokenService.verifyToken(refreshToken, tokenTypes.REFRESH);
+    if (!refreshToken) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'No refresh token provided');
+    }
+
+    const refreshTokenDoc = await Token.findOne({
+      token: refreshToken,
+      type: tokenTypes.REFRESH,
+      blacklisted: false,
+    });
+
+    if (!refreshTokenDoc) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'Refresh token not found');
+    }
+
     const user = await userService.getUserById(refreshTokenDoc.user);
     if (!user) {
-      throw new Error();
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'User not found');
     }
+
     await refreshTokenDoc.remove();
-    return tokenService.generateAuthTokens(user);
+    const tokens = await tokenService.generateAuthTokens(user);
+    return tokens;
   } catch (error) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate');
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid refresh token');
   }
 };
 
