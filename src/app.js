@@ -10,6 +10,8 @@ const { authLimiter } = require('./middlewares/rateLimiter');
 const routes = require('./routes/v1');
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
+const logger = require('./config/logger');
+const axios = require('axios');
 
 const app = express();
 
@@ -19,9 +21,56 @@ if (config.env !== 'test') {
   app.use(morgan.errorHandler);
 }
 
+// Health check cron job
+const healthCheck = async () => {
+  try {
+    // Check the backend API
+    await axios.get(`${process.env.SERVER_URL}/health`);
+    logger.info('Backend health check: OK');
+
+    // Check the frontend
+    await axios.get(config.clientUrl);
+    logger.info('Frontend health check: OK');
+  } catch (error) {
+    logger.error('Health check failed:', error.message);
+  }
+};
+
+// Run health check every 30 seconds
+setInterval(healthCheck, 30000);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date(),
+    environment: config.env,
+    service: 'Elite Transportation API',
+    serverUrl: process.env.SERVER_URL,
+    clientUrl: config.clientUrl,
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Elite Transportation API',
+    environment: config.env,
+    version: '1.0.0',
+    serverUrl: process.env.SERVER_URL,
+    clientUrl: config.clientUrl,
+  });
+});
+
 // CORS Configuration
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://checkout.stripe.com', /\.stripe\.com$/],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://checkout.stripe.com',
+    /\.stripe\.com$/,
+    config.clientUrl,
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'Origin', 'Accept', 'X-Requested-With'],
@@ -58,5 +107,8 @@ app.use((req, res, next) => {
 // Error handling
 app.use(errorConverter);
 app.use(errorHandler);
+
+// Start health check immediately
+healthCheck();
 
 module.exports = app;
