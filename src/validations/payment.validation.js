@@ -39,7 +39,7 @@ const createCheckoutSession = {
         miles: Joi.number().required(),
       }),
       duration: Joi.string().required(),
-      vehicle: Joi.string().allow(''), // Make vehicle optional for now
+      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group').required(),
       passengerDetails: Joi.object({
         firstName: Joi.string().required(),
         lastName: Joi.string().required(),

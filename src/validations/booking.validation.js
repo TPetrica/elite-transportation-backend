@@ -35,7 +35,7 @@ const createBooking = {
       })
       .required(),
     duration: Joi.string().required(),
-    vehicle: Joi.string().custom(objectId).required(),
+    service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group').required(),
     extras: Joi.array().items(
       Joi.object().keys({
         item: Joi.string().custom(objectId).required(),
@@ -83,26 +83,7 @@ const createBooking = {
   }),
 };
 
-const getBookings = {
-  query: Joi.object().keys({
-    sortBy: Joi.string(),
-    limit: Joi.number().integer(),
-    page: Joi.number().integer(),
-  }),
-};
-
-const getBooking = {
-  params: Joi.object().keys({
-    bookingId: Joi.string().custom(objectId),
-  }),
-};
-
-const getBookingByNumber = {
-  params: Joi.object().keys({
-    bookingNumber: Joi.string().required(),
-  }),
-};
-
+// Rest of the validation schemas remain the same but remove any vehicle references
 const updateBooking = {
   params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId),
@@ -127,6 +108,7 @@ const updateBooking = {
         }),
       }),
       status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group'),
       passengerDetails: Joi.object().keys({
         firstName: Joi.string(),
         lastName: Joi.string(),
@@ -141,6 +123,27 @@ const updateBooking = {
       }),
     })
     .min(1),
+};
+
+// Other schemas remain the same
+const getBookings = {
+  query: Joi.object().keys({
+    sortBy: Joi.string(),
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
+  }),
+};
+
+const getBooking = {
+  params: Joi.object().keys({
+    bookingId: Joi.string().custom(objectId),
+  }),
+};
+
+const getBookingByNumber = {
+  params: Joi.object().keys({
+    bookingNumber: Joi.string().required(),
+  }),
 };
 
 const cancelBooking = {

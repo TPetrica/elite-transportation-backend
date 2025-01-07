@@ -20,11 +20,7 @@ const createBooking = async (bookingBody) => {
   try {
     logger.info('Starting booking creation process');
 
-    // Validate vehicle
-    const vehicle = await Vehicle.findById(bookingBody.vehicle);
-    if (!vehicle) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Vehicle not found');
-    }
+    // No need for vehicle validation anymore
 
     // Validate extras if any
     if (bookingBody.extras?.length) {
@@ -65,17 +61,10 @@ const createBooking = async (bookingBody) => {
     // Generate booking number
     const bookingNumber = await Booking.generateBookingNumber();
 
-    // Calculate total price
-    const totalPrice = await calculateTripPrice(bookingBody.distance.km, vehicle, bookingBody.extras);
-
-    // Create booking
+    // The amount comes directly from the payment now
     const booking = await Booking.create({
       ...bookingBody,
       bookingNumber,
-      payment: {
-        ...bookingBody.payment,
-        amount: totalPrice,
-      },
     });
 
     logger.info(`Booking created with ID: ${booking._id}`);
@@ -95,7 +84,7 @@ const createBooking = async (bookingBody) => {
     try {
       const emailData = {
         bookingNumber: booking.bookingNumber,
-        amount: totalPrice,
+        amount: booking.payment.amount,
         pickupDetails: {
           date: booking.pickup.date,
           time: booking.pickup.time,
@@ -105,7 +94,7 @@ const createBooking = async (bookingBody) => {
           address: booking.dropoff.address,
         },
         passengerDetails: booking.passengerDetails,
-        vehicle: vehicle,
+        service: booking.service,
         extras: booking.extras,
       };
 

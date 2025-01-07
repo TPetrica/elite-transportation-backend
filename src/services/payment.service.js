@@ -46,13 +46,7 @@ const getSessionById = async (sessionId) => {
 
     const [stripeSession, payment] = await Promise.all([
       stripe.checkout.sessions.retrieve(sessionId),
-      Payment.findOne({ stripeSessionId: sessionId }).populate({
-        path: 'booking',
-        populate: {
-          path: 'vehicle',
-          select: 'name class image',
-        },
-      }),
+      Payment.findOne({ stripeSessionId: sessionId }).populate('booking'),
     ]);
 
     if (!payment) {
@@ -60,26 +54,51 @@ const getSessionById = async (sessionId) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Payment not found');
     }
 
+    // Parse the bookingData from metadata if booking is not yet created
+    let bookingDetails = {};
+    if (payment.metadata?.bookingData) {
+      try {
+        const parsedBookingData = JSON.parse(payment.metadata.bookingData);
+        bookingDetails = {
+          service: parsedBookingData.service,
+          pickupAddress: parsedBookingData.pickup.address,
+          dropoffAddress: parsedBookingData.dropoff.address,
+          pickupDate: parsedBookingData.pickup.date,
+          pickupTime: parsedBookingData.pickup.time,
+          distance: parsedBookingData.distance
+            ? `${parsedBookingData.distance.km} km / ${parsedBookingData.distance.miles} miles`
+            : null,
+          duration: parsedBookingData.duration,
+          passengerDetails: parsedBookingData.passengerDetails,
+        };
+      } catch (error) {
+        logger.error('Error parsing booking data from metadata:', error);
+      }
+    }
+
+    // If booking exists, use that data instead
+    if (payment.booking) {
+      bookingDetails = {
+        bookingNumber: payment.booking.bookingNumber,
+        service: payment.booking.service,
+        pickupAddress: payment.booking.pickup.address,
+        dropoffAddress: payment.booking.dropoff.address,
+        pickupDate: payment.booking.pickup.date,
+        pickupTime: payment.booking.pickup.time,
+        distance: payment.booking.distance
+          ? `${payment.booking.distance.km} km / ${payment.booking.distance.miles} miles`
+          : null,
+        duration: payment.booking.duration,
+        passengerDetails: payment.booking.passengerDetails,
+      };
+    }
+
     return {
       amount: stripeSession.amount_total / 100,
       status: payment.status,
-      email: stripeSession.customer_email,
+      email: stripeSession.customer_details?.email || payment.metadata?.customerEmail,
       billingDetails: payment.billingDetails,
-      bookingDetails: payment.booking
-        ? {
-            bookingNumber: payment.booking.bookingNumber,
-            pickupAddress: payment.booking.pickup.address,
-            dropoffAddress: payment.booking.dropoff.address,
-            pickupDate: payment.booking.pickup.date,
-            pickupTime: payment.booking.pickup.time,
-            distance: payment.booking.distance
-              ? `${payment.booking.distance.km} km / ${payment.booking.distance.miles} miles`
-              : null,
-            duration: payment.booking.duration,
-            vehicle: payment.booking.vehicle,
-            passengerDetails: payment.booking.passengerDetails,
-          }
-        : {},
+      bookingDetails,
       metadata: payment.metadata || {},
     };
   } catch (error) {

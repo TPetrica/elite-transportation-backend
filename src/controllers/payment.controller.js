@@ -13,6 +13,8 @@ const { Payment } = require('../models');
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
 
+  console.log('req.body', req.body);
+  console.log('billingDetails', billingDetails);
   try {
     // Create Stripe Customer first
     const customer = await stripe.customers.create({
@@ -32,6 +34,11 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       email: customer.email,
     });
 
+    // Map the incoming vehicle field to service
+    const modifiedBookingData = {
+      ...bookingData,
+    };
+
     // Create temporary payment record to store booking data
     const tempPayment = await paymentService.createPayment({
       amount,
@@ -40,7 +47,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       status: 'pending',
       metadata: {
         bookingData: JSON.stringify({
-          ...bookingData,
+          ...modifiedBookingData,
           billingDetails,
           payment: {
             method: 'credit_card',

@@ -70,10 +70,9 @@ const bookingSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    // Vehicle Details
-    vehicle: {
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: 'Vehicle',
+    service: {
+      type: String,
+      enum: ['to-airport', 'from-airport', 'round-trip', 'hourly', 'group'],
       required: true,
     },
     // Passenger Details
