@@ -84,7 +84,6 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       throw new Error('Address details are missing');
     }
 
-    // Format service type for display
     const getServiceName = (service) => {
       switch (service) {
         case 'from-airport':
@@ -96,11 +95,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       }
     };
 
-    // Format pickup date
     const pickupDate = moment(bookingData.pickupDetails.date).format('MMMM Do YYYY');
-    const subject = `Booking Confirmation - #${bookingData.bookingNumber}`;
-
-    // Safely handle extras
     const extras =
       bookingData.extras?.length > 0
         ? bookingData.extras
@@ -109,7 +104,6 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
             .join('\\n')
         : 'No extras added';
 
-    // Add logo attachment
     const attachments = [
       {
         filename: 'logo.jpeg',
@@ -118,7 +112,8 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       },
     ];
 
-    const html = `
+    // Customer's email content
+    const customerHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="text-align: center; margin-bottom: 20px;">
           <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
@@ -151,12 +146,6 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
         </div>
 
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Passenger Details</h3>
-          <p><strong>Name:</strong> ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}</p>
-          <p><strong>Phone:</strong> ${bookingData.passengerDetails.phone}</p>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #28a745;">Payment Details</h3>
           <p><strong>Total Amount:</strong> $${bookingData.amount.toFixed(2)}</p>
         </div>
@@ -175,7 +164,54 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       </div>
     `;
 
-    const text = `
+    // Business owner's email content
+    const ownerHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
+        </div>
+        
+        <h2 style="color: #333;">New Booking Alert</h2>
+        <p>A new booking has been received!</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #28a745;">Booking Details</h3>
+          <p><strong>Booking Number:</strong> ${bookingData.bookingNumber}</p>
+          <p><strong>Date:</strong> ${pickupDate}</p>
+          <p><strong>Time:</strong> ${bookingData.pickupDetails.time}</p>
+          <p><strong>Pickup:</strong> ${bookingData.pickupDetails.address}</p>
+          <p><strong>Drop-off:</strong> ${bookingData.dropoffDetails.address}</p>
+        </div>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #28a745;">Customer Details</h3>
+          <p><strong>Name:</strong> ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}</p>
+          <p><strong>Phone:</strong> ${bookingData.passengerDetails.phone}</p>
+          <p><strong>Email:</strong> ${to}</p>
+        </div>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #28a745;">Service Details</h3>
+          <p><strong>Service Type:</strong> ${getServiceName(bookingData.service)}</p>
+          <p><strong>Passengers:</strong> ${bookingData.passengerDetails.passengers}</p>
+          <p><strong>Luggage:</strong> ${bookingData.passengerDetails.luggage}</p>
+          ${
+            bookingData.passengerDetails.specialRequirements
+              ? `<p><strong>Special Requirements:</strong> ${bookingData.passengerDetails.specialRequirements}</p>`
+              : ''
+          }
+          <p><strong>Extras:</strong></p>
+          <pre style="margin: 10px 0;">${extras}</pre>
+        </div>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #28a745;">Payment Details</h3>
+          <p><strong>Total Amount:</strong> $${bookingData.amount.toFixed(2)}</p>
+        </div>
+      </div>
+    `;
+
+    const customerText = `
       Booking Confirmation - #${bookingData.bookingNumber}
 
       Thank you for your booking!
@@ -200,10 +236,6 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       Extras:
       ${extras}
 
-      Passenger Details:
-      - Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
-      - Phone: ${bookingData.passengerDetails.phone}
-
       Payment Details:
       - Total Amount: $${bookingData.amount.toFixed(2)}
 
@@ -215,20 +247,64 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       +1 (435) 901-9158
     `;
 
-    await sendEmail(to, subject, text, html, attachments);
+    const ownerText = `
+      New Booking Alert - #${bookingData.bookingNumber}
 
-    logger.info('Booking confirmation email sent successfully:', {
+      A new booking has been received!
+
+      Customer Details:
+      - Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
+      - Phone: ${bookingData.passengerDetails.phone}
+      - Email: ${to}
+
+      Booking Details:
+      - Booking Number: ${bookingData.bookingNumber}
+      - Date: ${pickupDate}
+      - Time: ${bookingData.pickupDetails.time}
+      - Pickup: ${bookingData.pickupDetails.address}
+      - Drop-off: ${bookingData.dropoffDetails.address}
+
+      Service Details:
+      - Service Type: ${getServiceName(bookingData.service)}
+      - Passengers: ${bookingData.passengerDetails.passengers}
+      - Luggage: ${bookingData.passengerDetails.luggage}
+      ${
+        bookingData.passengerDetails.specialRequirements
+          ? `- Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
+          : ''
+      }
+      
+      Extras:
+      ${extras}
+
+      Payment Details:
+      - Total Amount: $${bookingData.amount.toFixed(2)}
+    `;
+
+    // Send email to customer
+    await sendEmail(to, `Booking Confirmation - #${bookingData.bookingNumber}`, customerText, customerHtml, attachments);
+
+    // Send email to business owner
+    await sendEmail(
+      config.email.from,
+      `New Booking Alert - #${bookingData.bookingNumber}`,
+      ownerText,
+      ownerHtml,
+      attachments
+    );
+
+    logger.info('Booking confirmation emails sent successfully:', {
       to,
+      owner: config.email.from,
       bookingNumber: bookingData.bookingNumber,
     });
   } catch (error) {
-    logger.error('Error sending booking confirmation email:', {
+    logger.error('Error sending booking confirmation emails:', {
       error: error.message,
       stack: error.stack,
       to,
       bookingNumber: bookingData?.bookingNumber,
     });
-    // Don't throw error, just log it
   }
 };
 
@@ -336,18 +412,23 @@ const sendPaymentSuccessEmail = async (to, paymentData) => {
   }
 };
 
+/**
+ * Send invoice email to both customer and business owner
+ * @param {string} to - Customer's email
+ * @param {object} invoiceData
+ * @param {object} session
+ * @param {object} booking
+ * @returns {Promise}
+ */
 const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
-  logger.debug('Starting sendInvoiceEmail with data:', {
-    to,
-    bookingNumber: booking?.bookingNumber,
-    sessionId: session?.id,
-    hasBookingData: !!booking,
-    hasSessionData: !!session,
-    invoiceDataPresent: !!invoiceData,
-  });
-
   try {
-    // Validate required data
+    logger.debug('Attempting to send invoice emails with:', {
+      to,
+      bookingNumber: booking?.bookingNumber,
+      sessionId: session?.id,
+    });
+
+    // Validate required booking data
     if (!booking) {
       throw new Error('Booking data is required');
     }
@@ -356,39 +437,22 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       throw new Error('Session data is required');
     }
 
-    if (!booking.pickup?.address) {
-      throw new Error('Pickup address is required');
-    }
-
-    if (!booking.dropoff?.address) {
-      throw new Error('Dropoff address is required');
+    if (!booking.pickup?.address || !booking.dropoff?.address) {
+      throw new Error('Missing required booking address information');
     }
 
     if (!booking.passengerDetails?.firstName || !booking.passengerDetails?.lastName) {
-      throw new Error('Passenger details are required');
+      throw new Error('Missing required passenger details');
     }
 
-    const amount = (session.amount_total || 0) / 100;
+    const amount = session.amount_total / 100;
 
-    // Prepare logo
-    const logoPath = path.join(__dirname, '../assets/logo.jpeg');
-
-    // Verify logo exists
-    try {
-      await fs.promises.access(logoPath, fs.constants.R_OK);
-      logger.debug('Logo file verified at:', logoPath);
-    } catch (error) {
-      logger.warn('Logo file not accessible:', { path: logoPath, error: error.message });
-      // Continue without logo if not found
-    }
-
-    const attachments = [
-      {
-        filename: 'logo.jpeg',
-        path: logoPath,
-        cid: 'companyLogo',
-      },
-    ];
+    logger.debug('Preparing template data with:', {
+      amount,
+      bookingNumber: booking.bookingNumber,
+      pickup: booking.pickup.address,
+      dropoff: booking.dropoff.address,
+    });
 
     const products = [
       {
@@ -418,11 +482,11 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
         city: 'Park City',
         postCode: '05820',
         country: 'United States',
-        email: config.email.from || 'elitetransportationpc@gmail.com',
+        email: config.email.from,
         phone: '+1 (435) 901-9158',
       },
       customer: {
-        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`.trim(),
+        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
         address: booking.billingDetails?.address || '',
         city: booking.billingDetails?.city || '',
         postCode: booking.billingDetails?.zipCode || '',
@@ -435,51 +499,76 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       totalAmount,
     };
 
-    logger.debug('Template data prepared:', {
-      invoiceNumber: templateData.invoiceNumber,
-      customerName: templateData.customer.name,
-      totalAmount: templateData.totalAmount,
-    });
+    // Add logo attachment
+    const attachments = [
+      {
+        filename: 'logo.jpeg',
+        path: path.join(__dirname, '../assets/logo.jpeg'),
+        cid: 'companyLogo',
+      },
+    ];
 
+    logger.debug('Generating HTML from template');
     const html = invoiceTemplate(templateData);
 
     if (!html) {
       throw new Error('Failed to generate invoice HTML');
     }
 
+    logger.debug('Generated HTML length:', html?.length);
+
+    // Create plain text version
     const text = `
       ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}
+
       Date: ${templateData.invoiceDate}
       From: ${booking.pickup.address}
       To: ${booking.dropoff.address}
+
+      Service Details:
+      - Transportation Service
+      - From: ${booking.pickup.address}
+      - To: ${booking.dropoff.address}
+      
+      Customer Details:
+      - Name: ${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}
+      - Phone: ${booking.passengerDetails.phone}
+
+      Payment Details:
       Amount: $${amount.toFixed(2)}
       VAT (0%): $${totalVatAmount.toFixed(2)}
       Total: $${totalAmount.toFixed(2)}
+
       Thank you for choosing ELITE TRANSPORTARION PC!
     `;
 
-    const subject = `ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}`;
+    // Send invoice to customer
+    const customerSubject = `ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}`;
+    await sendEmail(to, customerSubject, text, html, attachments);
 
-    const emailSent = await sendEmail(to, subject, text, html, attachments);
+    logger.info('Invoice email sent to customer:', {
+      to,
+      bookingNumber: booking.bookingNumber,
+      amount: totalAmount,
+    });
 
-    if (emailSent) {
-      logger.info('Invoice email sent successfully:', {
-        to,
-        bookingNumber: booking.bookingNumber,
-        amount: totalAmount,
-      });
-    }
+    // Send copy to business owner
+    const ownerSubject = `Invoice Copy - Booking #${booking.bookingNumber}`;
+    await sendEmail(config.email.from, ownerSubject, text, html, attachments);
 
-    return emailSent;
+    logger.info('Invoice copy sent to business owner:', {
+      to: config.email.from,
+      bookingNumber: booking.bookingNumber,
+      amount: totalAmount,
+    });
   } catch (error) {
-    console.log('error', error);
     logger.error('Error sending invoice email:', {
       error: error.message,
       stack: error.stack,
       to,
       bookingNumber: booking?.bookingNumber,
     });
-    throw error;
+    throw error; // Re-throw for webhook handler
   }
 };
 
