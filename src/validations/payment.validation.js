@@ -26,6 +26,7 @@ const createCheckoutSession = {
         time: Joi.string().required(),
         flightNumber: Joi.string().allow(''),
         flightTime: Joi.string().allow('', null),
+        isCustom: Joi.boolean().optional(), // Added this field
       }),
       dropoff: Joi.object({
         address: Joi.string().required(),
@@ -33,6 +34,7 @@ const createCheckoutSession = {
           lat: Joi.number().required(),
           lng: Joi.number().required(),
         }),
+        isCustom: Joi.boolean().optional(), // Added this field
       }),
       distance: Joi.object({
         km: Joi.number().required(),

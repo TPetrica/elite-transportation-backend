@@ -1,9 +1,9 @@
 const nodemailer = require('nodemailer');
-const moment = require('moment');
 const config = require('../config/config');
 const logger = require('../config/logger');
+const moment = require('moment');
+const path = require('path');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const Handlebars = require('handlebars');
 const invoiceTemplate = require('./email/templates/invoiceTemplate');
 
 let transport;
@@ -37,11 +37,11 @@ if (
   logger.warn('EMAIL_FROM=your-email@domain.com');
 }
 
-const sendEmail = async (to, subject, text, html) => {
+const sendEmail = async (to, subject, text, html, attachments = []) => {
   if (!transport) {
     logger.warn(`Email not sent to ${to} - SMTP not configured`);
     logger.debug('Would have sent:', { to, subject, text });
-    return; // Silent fail
+    return;
   }
 
   try {
@@ -51,12 +51,13 @@ const sendEmail = async (to, subject, text, html) => {
       subject,
       text,
       html,
+      attachments,
     };
     await transport.sendMail(msg);
     logger.info(`Email sent successfully to ${to}`);
   } catch (error) {
     logger.error('Error sending email:', error);
-    // Don't throw error, just log it
+    throw error; // Re-throw the error for handling by the caller
   }
 };
 
@@ -70,20 +71,59 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
   try {
     logger.debug('Sending booking confirmation with data:', bookingData);
 
-    if (!transport) {
-      logger.warn(`Booking confirmation email not sent to ${to} - SMTP not configured`);
-      return; // Silent fail
+    // Validate required data
+    if (!bookingData) {
+      throw new Error('Booking data is required');
     }
 
+    if (!bookingData.pickupDetails?.date || !bookingData.pickupDetails?.time) {
+      throw new Error('Pickup details are missing');
+    }
+
+    if (!bookingData.pickupDetails?.address || !bookingData.dropoffDetails?.address) {
+      throw new Error('Address details are missing');
+    }
+
+    // Format service type for display
+    const getServiceName = (service) => {
+      switch (service) {
+        case 'from-airport':
+          return 'Airport Pickup Service';
+        case 'to-airport':
+          return 'Airport Drop-off Service';
+        default:
+          return 'Transportation Service';
+      }
+    };
+
+    // Format pickup date
     const pickupDate = moment(bookingData.pickupDetails.date).format('MMMM Do YYYY');
     const subject = `Booking Confirmation - #${bookingData.bookingNumber}`;
 
+    // Safely handle extras
     const extras =
-      bookingData.extras?.map((extra) => `${extra.item.name} x${extra.quantity} - $${extra.price.toFixed(2)}`).join('\n') ||
-      'No extras added';
+      bookingData.extras?.length > 0
+        ? bookingData.extras
+            .filter((extra) => extra && extra.item && typeof extra.price === 'number')
+            .map((extra) => `${extra.item.name || 'Item'} x${extra.quantity || 1} - $${extra.price.toFixed(2)}`)
+            .join('\\n')
+        : 'No extras added';
+
+    // Add logo attachment
+    const attachments = [
+      {
+        filename: 'logo.jpeg',
+        path: path.join(__dirname, '../assets/logo.jpeg'),
+        cid: 'companyLogo',
+      },
+    ];
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
+        </div>
+        
         <h2 style="color: #333;">Booking Confirmation</h2>
         <p>Thank you for your booking!</p>
         
@@ -98,9 +138,22 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
 
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #28a745;">Service Details</h3>
-          <p><strong>Vehicle:</strong> ${bookingData.vehicle.name}</p>
+          <p><strong>Service Type:</strong> ${getServiceName(bookingData.service)}</p>
+          <p><strong>Passengers:</strong> ${bookingData.passengerDetails.passengers}</p>
+          <p><strong>Luggage:</strong> ${bookingData.passengerDetails.luggage}</p>
+          ${
+            bookingData.passengerDetails.specialRequirements
+              ? `<p><strong>Special Requirements:</strong> ${bookingData.passengerDetails.specialRequirements}</p>`
+              : ''
+          }
           <p><strong>Extras:</strong></p>
           <pre style="margin: 10px 0;">${extras}</pre>
+        </div>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #28a745;">Passenger Details</h3>
+          <p><strong>Name:</strong> ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}</p>
+          <p><strong>Phone:</strong> ${bookingData.passengerDetails.phone}</p>
         </div>
 
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
@@ -111,6 +164,14 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
         <p style="color: #666; font-size: 14px;">
           You will receive a payment confirmation and invoice once the payment is processed.
         </p>
+
+        <div style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 20px; text-align: center; font-size: 12px; color: #525252;">
+          ELITE TRANSPORTARION PC
+          <span style="color: #cbd5e1; margin: 0 10px;">|</span>
+          elitetransportationpc@gmail.com
+          <span style="color: #cbd5e1; margin: 0 10px;">|</span>
+          +1 (435) 901-9158
+        </div>
       </div>
     `;
 
@@ -127,20 +188,46 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       - Drop-off: ${bookingData.dropoffDetails.address}
 
       Service Details:
-      - Vehicle: ${bookingData.vehicle.name}
+      - Service Type: ${getServiceName(bookingData.service)}
+      - Passengers: ${bookingData.passengerDetails.passengers}
+      - Luggage: ${bookingData.passengerDetails.luggage}
+      ${
+        bookingData.passengerDetails.specialRequirements
+          ? `- Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
+          : ''
+      }
       
       Extras:
       ${extras}
+
+      Passenger Details:
+      - Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
+      - Phone: ${bookingData.passengerDetails.phone}
 
       Payment Details:
       - Total Amount: $${bookingData.amount.toFixed(2)}
 
       You will receive a payment confirmation and invoice once the payment is processed.
+
+      Contact:
+      ELITE TRANSPORTARION PC
+      elitetransportationpc@gmail.com
+      +1 (435) 901-9158
     `;
 
-    await sendEmail(to, subject, text, html);
+    await sendEmail(to, subject, text, html, attachments);
+
+    logger.info('Booking confirmation email sent successfully:', {
+      to,
+      bookingNumber: bookingData.bookingNumber,
+    });
   } catch (error) {
-    logger.error('Error sending booking confirmation email:', error);
+    logger.error('Error sending booking confirmation email:', {
+      error: error.message,
+      stack: error.stack,
+      to,
+      bookingNumber: bookingData?.bookingNumber,
+    });
     // Don't throw error, just log it
   }
 };
@@ -250,30 +337,58 @@ const sendPaymentSuccessEmail = async (to, paymentData) => {
 };
 
 const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
-  logger.debug('Attempting to send invoice email with:', {
+  logger.debug('Starting sendInvoiceEmail with data:', {
     to,
     bookingNumber: booking?.bookingNumber,
     sessionId: session?.id,
+    hasBookingData: !!booking,
+    hasSessionData: !!session,
+    invoiceDataPresent: !!invoiceData,
   });
 
   try {
-    // Validate required booking data
-    if (!booking?.pickup?.address || !booking?.dropoff?.address) {
-      throw new Error('Missing required booking address information');
+    // Validate required data
+    if (!booking) {
+      throw new Error('Booking data is required');
     }
 
-    if (!booking?.passengerDetails?.firstName || !booking?.passengerDetails?.lastName) {
-      throw new Error('Missing required passenger details');
+    if (!session) {
+      throw new Error('Session data is required');
     }
 
-    const amount = session.amount_total / 100;
+    if (!booking.pickup?.address) {
+      throw new Error('Pickup address is required');
+    }
 
-    logger.debug('Preparing template data with:', {
-      amount,
-      bookingNumber: booking.bookingNumber,
-      pickup: booking.pickup.address,
-      dropoff: booking.dropoff.address,
-    });
+    if (!booking.dropoff?.address) {
+      throw new Error('Dropoff address is required');
+    }
+
+    if (!booking.passengerDetails?.firstName || !booking.passengerDetails?.lastName) {
+      throw new Error('Passenger details are required');
+    }
+
+    const amount = (session.amount_total || 0) / 100;
+
+    // Prepare logo
+    const logoPath = path.join(__dirname, '../assets/logo.jpeg');
+
+    // Verify logo exists
+    try {
+      await fs.promises.access(logoPath, fs.constants.R_OK);
+      logger.debug('Logo file verified at:', logoPath);
+    } catch (error) {
+      logger.warn('Logo file not accessible:', { path: logoPath, error: error.message });
+      // Continue without logo if not found
+    }
+
+    const attachments = [
+      {
+        filename: 'logo.jpeg',
+        path: logoPath,
+        cid: 'companyLogo',
+      },
+    ];
 
     const products = [
       {
@@ -296,18 +411,18 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       }),
       invoiceNumber: booking.bookingNumber,
       supplier: {
-        name: 'LUXRIDE',
-        number: '23456789',
-        vat: '23456789',
+        name: 'ELITE TRANSPORTARION PC',
+        number: 'asdasd123',
+        vat: 'a441ssad',
         address: '6622 Abshire Mills',
-        city: 'Port Orlofurt',
+        city: 'Park City',
         postCode: '05820',
         country: 'United States',
-        email: config.email.from,
-        phone: '+1-202-555-0106',
+        email: config.email.from || 'elitetransportationpc@gmail.com',
+        phone: '+1 (435) 901-9158',
       },
       customer: {
-        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
+        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`.trim(),
         address: booking.billingDetails?.address || '',
         city: booking.billingDetails?.city || '',
         postCode: booking.billingDetails?.zipCode || '',
@@ -320,48 +435,51 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       totalAmount,
     };
 
-    logger.debug('Generating HTML from template');
+    logger.debug('Template data prepared:', {
+      invoiceNumber: templateData.invoiceNumber,
+      customerName: templateData.customer.name,
+      totalAmount: templateData.totalAmount,
+    });
+
     const html = invoiceTemplate(templateData);
 
     if (!html) {
       throw new Error('Failed to generate invoice HTML');
     }
 
-    logger.debug('Generated HTML length:', html?.length);
-
-    // Create plain text version
     const text = `
-      LUXRIDE Invoice #${booking.bookingNumber}
-
+      ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}
       Date: ${templateData.invoiceDate}
       From: ${booking.pickup.address}
       To: ${booking.dropoff.address}
-
       Amount: $${amount.toFixed(2)}
       VAT (0%): $${totalVatAmount.toFixed(2)}
       Total: $${totalAmount.toFixed(2)}
-
-      Thank you for choosing LUXRIDE!
+      Thank you for choosing ELITE TRANSPORTARION PC!
     `;
 
-    const subject = `LUXRIDE Invoice #${booking.bookingNumber}`;
+    const subject = `ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}`;
 
-    // Use the existing sendEmail function
-    await sendEmail(to, subject, text, html);
+    const emailSent = await sendEmail(to, subject, text, html, attachments);
 
-    logger.info('Invoice email sent successfully:', {
-      to,
-      bookingNumber: booking.bookingNumber,
-      amount: totalAmount,
-    });
+    if (emailSent) {
+      logger.info('Invoice email sent successfully:', {
+        to,
+        bookingNumber: booking.bookingNumber,
+        amount: totalAmount,
+      });
+    }
+
+    return emailSent;
   } catch (error) {
+    console.log('error', error);
     logger.error('Error sending invoice email:', {
       error: error.message,
       stack: error.stack,
       to,
       bookingNumber: booking?.bookingNumber,
     });
-    throw error; // Re-throw for webhook handler
+    throw error;
   }
 };
 

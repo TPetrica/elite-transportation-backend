@@ -8,7 +8,22 @@ const invoiceTemplate = ({
   totalNetAmount,
   totalVatAmount,
   totalAmount,
-}) => `
+}) => {
+  try {
+    // Validate required data
+    if (!invoiceDate || !invoiceNumber || !supplier || !customer || !products) {
+      throw new Error('Missing required template data');
+    }
+
+    if (!supplier.name || !supplier.address || !supplier.email) {
+      throw new Error('Missing required supplier information');
+    }
+
+    if (!customer.name) {
+      throw new Error('Missing required customer information');
+    }
+
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -22,7 +37,7 @@ const invoiceTemplate = ({
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
       <tr>
         <td style="width: 50%; vertical-align: top;">
-          <img src="cid:logo" style="height: 48px;" alt="Logo" />
+          <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
         </td>
         <td style="width: 50%; vertical-align: top;">
           <table style="width: 100%; border-collapse: collapse;">
@@ -45,23 +60,22 @@ const invoiceTemplate = ({
       </tr>
     </table>
 
-    <!-- Rest of the template remains the same -->
     <!-- Addresses -->
     <table style="width: 100%; border-collapse: collapse; background-color: #f1f5f9; padding: 20px; margin-bottom: 30px;">
       <tr>
         <td style="width: 50%; vertical-align: top; padding: 20px;">
           <div style="font-size: 14px; color: #525252;">
             <div style="font-weight: bold;">${supplier.name}</div>
-            <div>Number: ${supplier.number}</div>
-            <div>VAT: ${supplier.vat}</div>
+            ${supplier.number ? `<div>Number: ${supplier.number}</div>` : ''}
+            ${supplier.vat ? `<div>VAT: ${supplier.vat}</div>` : ''}
             <div>${supplier.address}</div>
-            <div>${supplier.city}, ${supplier.postCode}</div>
-            <div>${supplier.country}</div>
+            ${supplier.city && supplier.postCode ? `<div>${supplier.city}, ${supplier.postCode}</div>` : ''}
+            ${supplier.country ? `<div>${supplier.country}</div>` : ''}
           </div>
         </td>
         <td style="width: 50%; vertical-align: top; text-align: right; padding: 20px;">
           <div style="font-size: 14px; color: #525252;">
-            ${customer.name ? `<div style="font-weight: bold;">${customer.name}</div>` : ''}
+            <div style="font-weight: bold;">${customer.name}</div>
             ${customer.address ? `<div>${customer.address}</div>` : ''}
             ${customer.city && customer.postCode ? `<div>${customer.city}, ${customer.postCode}</div>` : ''}
             ${customer.country ? `<div>${customer.country}</div>` : ''}
@@ -161,6 +175,11 @@ const invoiceTemplate = ({
   </div>
 </body>
 </html>
-`;
+    `;
+  } catch (error) {
+    console.error('Error generating invoice template:', error);
+    throw error;
+  }
+};
 
 module.exports = invoiceTemplate;

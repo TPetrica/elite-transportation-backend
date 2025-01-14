@@ -15,6 +15,7 @@ const createBooking = {
             lng: Joi.number().required(),
           })
           .required(),
+        isCustom: Joi.boolean().optional(),
       })
       .required(),
     dropoff: Joi.object()
@@ -26,6 +27,7 @@ const createBooking = {
             lng: Joi.number().required(),
           })
           .required(),
+        isCustom: Joi.boolean().optional(),
       })
       .required(),
     distance: Joi.object()
