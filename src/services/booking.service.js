@@ -20,8 +20,6 @@ const createBooking = async (bookingBody) => {
   try {
     logger.info('Starting booking creation process');
 
-    // No need for vehicle validation anymore
-
     // Validate extras if any
     if (bookingBody.extras?.length) {
       const extraIds = bookingBody.extras.map((extra) => extra.item);
@@ -30,7 +28,6 @@ const createBooking = async (bookingBody) => {
         throw new ApiError(httpStatus.NOT_FOUND, 'One or more extras not found');
       }
 
-      // Set prices for extras
       bookingBody.extras = bookingBody.extras.map((extra) => {
         const extraDoc = extras.find((e) => e._id.toString() === extra.item.toString());
         return {
@@ -61,24 +58,13 @@ const createBooking = async (bookingBody) => {
     // Generate booking number
     const bookingNumber = await Booking.generateBookingNumber();
 
-    // The amount comes directly from the payment now
+    // Create the booking
     const booking = await Booking.create({
       ...bookingBody,
       bookingNumber,
     });
 
     logger.info(`Booking created with ID: ${booking._id}`);
-
-    // Book the time slot
-    try {
-      await availabilityService.bookTimeSlot(booking.pickup.date, booking.pickup.time, booking._id);
-      logger.info('Time slot booked successfully');
-    } catch (error) {
-      logger.error('Failed to book time slot:', error);
-      // If time slot booking fails, remove the booking
-      await Booking.findByIdAndDelete(booking._id);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to book time slot');
-    }
 
     // Send confirmation email
     try {
@@ -101,7 +87,6 @@ const createBooking = async (bookingBody) => {
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);
-      // Don't throw error for email failure
     }
 
     return booking;
@@ -192,14 +177,6 @@ const updateBookingById = async (bookingId, updateBody) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update completed booking');
     }
 
-    // If updating vehicle
-    if (updateBody.vehicle && updateBody.vehicle !== booking.vehicle.id) {
-      const vehicle = await Vehicle.findById(updateBody.vehicle);
-      if (!vehicle) {
-        throw new ApiError(httpStatus.NOT_FOUND, 'Vehicle not found');
-      }
-    }
-
     // If updating extras
     if (updateBody.extras) {
       const extraIds = updateBody.extras.map((extra) => extra.item);
@@ -208,7 +185,6 @@ const updateBookingById = async (bookingId, updateBody) => {
         throw new ApiError(httpStatus.NOT_FOUND, 'One or more extras not found');
       }
 
-      // Update extra prices
       updateBody.extras = updateBody.extras.map((extra) => {
         const extraDoc = extras.find((e) => e._id.toString() === extra.item.toString());
         return {
@@ -227,22 +203,6 @@ const updateBookingById = async (bookingId, updateBody) => {
       if (!isAvailable) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Selected time slot is not available');
       }
-
-      await availabilityService.releaseTimeSlot(bookingId);
-      await availabilityService.bookTimeSlot(newDate, newTime, bookingId);
-    }
-
-    // Recalculate total price if necessary
-    if (updateBody.vehicle || updateBody.extras || updateBody.distance) {
-      const vehicle = updateBody.vehicle ? await Vehicle.findById(updateBody.vehicle) : booking.vehicle;
-      const distance = updateBody.distance?.km || booking.distance.km;
-      const extras = updateBody.extras || booking.extras;
-
-      const totalPrice = await calculateTripPrice(distance, vehicle, extras);
-      updateBody.payment = {
-        ...booking.payment,
-        amount: totalPrice,
-      };
     }
 
     Object.assign(booking, updateBody);

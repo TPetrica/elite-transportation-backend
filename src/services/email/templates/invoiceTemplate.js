@@ -5,8 +5,6 @@ const invoiceTemplate = ({
   customer,
   products,
   currencySymbol = '$',
-  totalNetAmount,
-  totalVatAmount,
   totalAmount,
 }) => {
   try {
@@ -90,17 +88,13 @@ const invoiceTemplate = ({
           <th style="padding: 10px; text-align: left; color: #5c6ac4;">Product details</th>
           <th style="padding: 10px; text-align: right; color: #5c6ac4;">Price</th>
           <th style="padding: 10px; text-align: center; color: #5c6ac4;">Qty.</th>
-          <th style="padding: 10px; text-align: center; color: #5c6ac4;">VAT</th>
-          <th style="padding: 10px; text-align: right; color: #5c6ac4;">Subtotal</th>
-          <th style="padding: 10px; text-align: right; color: #5c6ac4;">Subtotal + VAT</th>
+          <th style="padding: 10px; text-align: right; color: #5c6ac4;">Total</th>
         </tr>
       </thead>
       <tbody>
         ${products
           .map((product, index) => {
-            const productSubtotal = product.price * product.quantity;
-            const productVatAmount = (productSubtotal * product.vat) / 100;
-            const productTotal = productSubtotal + productVatAmount;
+            const productTotal = product.price * product.quantity;
 
             return `
               <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -108,8 +102,6 @@ const invoiceTemplate = ({
                 <td style="padding: 10px;">${product.name}</td>
                 <td style="padding: 10px; text-align: right;">${currencySymbol}${product.price.toFixed(2)}</td>
                 <td style="padding: 10px; text-align: center;">${product.quantity}</td>
-                <td style="padding: 10px; text-align: center;">${product.vat}%</td>
-                <td style="padding: 10px; text-align: right;">${currencySymbol}${productSubtotal.toFixed(2)}</td>
                 <td style="padding: 10px; text-align: right;">${currencySymbol}${productTotal.toFixed(2)}</td>
               </tr>
             `;
@@ -124,18 +116,6 @@ const invoiceTemplate = ({
         <td style="width: 70%;"></td>
         <td style="width: 30%;">
           <table style="width: 100%; border-collapse: collapse;">
-            <tr style="border-bottom: 1px solid #e5e7eb;">
-              <td style="padding: 10px; color: #94a3b8;">Net total:</td>
-              <td style="padding: 10px; text-align: right; font-weight: bold; color: #5c6ac4;">
-                ${currencySymbol}${totalNetAmount.toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; color: #94a3b8;">VAT total:</td>
-              <td style="padding: 10px; text-align: right; font-weight: bold; color: #5c6ac4;">
-                ${currencySymbol}${totalVatAmount.toFixed(2)}
-              </td>
-            </tr>
             <tr style="background-color: #5c6ac4;">
               <td style="padding: 10px; color: white; font-weight: bold;">Total:</td>
               <td style="padding: 10px; text-align: right; color: white; font-weight: bold;">
@@ -146,15 +126,6 @@ const invoiceTemplate = ({
         </td>
       </tr>
     </table>
-
-    <!-- Payment Details -->
-    <div style="margin-bottom: 30px; font-size: 14px; color: #404040;">
-      <div style="font-weight: bold; color: #5c6ac4; margin-bottom: 10px;">PAYMENT DETAILS</div>
-      <div>Banks of Banks</div>
-      <div>Bank/Sort Code: 1234567</div>
-      <div>Account Number: 123456678</div>
-      <div>Payment Reference: ${invoiceNumber}</div>
-    </div>
 
     <!-- Notes -->
     <div style="margin-bottom: 30px; font-size: 14px; color: #404040;">

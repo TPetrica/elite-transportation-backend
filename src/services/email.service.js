@@ -459,13 +459,8 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
         name: `Transportation Service (${booking.pickup.address} to ${booking.dropoff.address})`,
         price: amount,
         quantity: 1,
-        vat: 0,
       },
     ];
-
-    const totalNetAmount = amount;
-    const totalVatAmount = 0;
-    const totalAmount = totalNetAmount + totalVatAmount;
 
     const templateData = {
       invoiceDate: new Date().toLocaleDateString('en-US', {
@@ -476,8 +471,6 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       invoiceNumber: booking.bookingNumber,
       supplier: {
         name: 'ELITE TRANSPORTATION',
-        // number: 'asdasd123',
-        // vat: 'a441ssad',
         address: '4343 w Discovery Way',
         city: 'Park City, Utah',
         postCode: '84098',
@@ -494,9 +487,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       },
       products,
       currencySymbol: '$',
-      totalNetAmount,
-      totalVatAmount,
-      totalAmount,
+      totalAmount: amount,
     };
 
     // Add logo attachment
@@ -535,9 +526,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       - Phone: ${booking.passengerDetails.phone}
 
       Payment Details:
-      Amount: $${amount.toFixed(2)}
-      VAT (0%): $${totalVatAmount.toFixed(2)}
-      Total: $${totalAmount.toFixed(2)}
+      Total Amount: $${amount.toFixed(2)}
 
       Thank you for choosing ELITE TRANSPORTATION!
     `;
@@ -549,7 +538,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
     logger.info('Invoice email sent to customer:', {
       to,
       bookingNumber: booking.bookingNumber,
-      amount: totalAmount,
+      amount: amount,
     });
 
     // Send copy to business owner
@@ -559,7 +548,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
     logger.info('Invoice copy sent to business owner:', {
       to: config.email.from,
       bookingNumber: booking.bookingNumber,
-      amount: totalAmount,
+      amount: amount,
     });
   } catch (error) {
     logger.error('Error sending invoice email:', {
@@ -568,7 +557,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       to,
       bookingNumber: booking?.bookingNumber,
     });
-    throw error; // Re-throw for webhook handler
+    throw error;
   }
 };
 
