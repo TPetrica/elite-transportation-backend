@@ -11,6 +11,12 @@ class AvailabilityService {
     return hours * 60 + minutes;
   }
 
+  minutesToTime(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
   isTimeInRanges(time, ranges) {
     const timeMinutes = this.timeToMinutes(time);
     return ranges.some((range) => {
@@ -22,15 +28,18 @@ class AvailabilityService {
 
   generateTimeSlots(ranges) {
     const slots = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 60) {
-        const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        if (this.isTimeInRanges(time, ranges)) {
-          slots.push(time);
-        }
+    const INTERVAL = 90;
+    const MINUTES_IN_DAY = 24 * 60;
+
+    // Generate slots for every 90 minutes
+    for (let minutes = 0; minutes < MINUTES_IN_DAY; minutes += INTERVAL) {
+      const time = this.minutesToTime(minutes);
+      if (this.isTimeInRanges(time, ranges)) {
+        slots.push(time);
       }
     }
-    logger.info(`Generated ${slots.length} time slots`);
+
+    logger.info(`Generated ${slots.length} time slots with 90-minute intervals`);
     return slots;
   }
 
