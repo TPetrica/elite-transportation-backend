@@ -155,7 +155,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
         </p>
 
         <div style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 20px; text-align: center; font-size: 12px; color: #525252;">
-          ELITE TRANSPORTARION PC
+          ELITE TRANSPORTATION
           <span style="color: #cbd5e1; margin: 0 10px;">|</span>
           elitetransportationpc@gmail.com
           <span style="color: #cbd5e1; margin: 0 10px;">|</span>
@@ -242,7 +242,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       You will receive a payment confirmation and invoice once the payment is processed.
 
       Contact:
-      ELITE TRANSPORTARION PC
+      ELITE TRANSPORTATION
       elitetransportationpc@gmail.com
       +1 (435) 901-9158
     `;
@@ -475,12 +475,12 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       }),
       invoiceNumber: booking.bookingNumber,
       supplier: {
-        name: 'ELITE TRANSPORTARION PC',
-        number: 'asdasd123',
-        vat: 'a441ssad',
-        address: '6622 Abshire Mills',
-        city: 'Park City',
-        postCode: '05820',
+        name: 'ELITE TRANSPORTATION',
+        // number: 'asdasd123',
+        // vat: 'a441ssad',
+        address: '4343 w Discovery Way',
+        city: 'Park City, Utah',
+        postCode: '84098',
         country: 'United States',
         email: config.email.from,
         phone: '+1 (435) 901-9158',
@@ -519,7 +519,7 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
 
     // Create plain text version
     const text = `
-      ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}
+      ELITE TRANSPORTATION Invoice #${booking.bookingNumber}
 
       Date: ${templateData.invoiceDate}
       From: ${booking.pickup.address}
@@ -539,11 +539,11 @@ const sendInvoiceEmail = async (to, invoiceData, session, booking) => {
       VAT (0%): $${totalVatAmount.toFixed(2)}
       Total: $${totalAmount.toFixed(2)}
 
-      Thank you for choosing ELITE TRANSPORTARION PC!
+      Thank you for choosing ELITE TRANSPORTATION!
     `;
 
     // Send invoice to customer
-    const customerSubject = `ELITE TRANSPORTARION PC Invoice #${booking.bookingNumber}`;
+    const customerSubject = `ELITE TRANSPORTATION Invoice #${booking.bookingNumber}`;
     await sendEmail(to, customerSubject, text, html, attachments);
 
     logger.info('Invoice email sent to customer:', {

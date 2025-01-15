@@ -1,82 +1,99 @@
 const moment = require('moment');
 const httpStatus = require('http-status');
+const Schedule = require('../models/schedule.model');
 const Booking = require('../models/booking.model');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
 class AvailabilityService {
-  generateTimeSlots() {
-    const slots = [];
-    const startHour = 17; // 5 PM
-    const endHour = 22; // 10 PM
-    const interval = 30; // 30 minutes
-
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += interval) {
-        slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
-      }
-    }
-
-    logger.info(`Generated ${slots.length} possible time slots: ${slots.join(', ')}`);
-    return slots;
+  timeToMinutes(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 
-  async getBookedSlots(date, excludeBookingId = null) {
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
+  isTimeInRanges(time, ranges) {
+    const timeMinutes = this.timeToMinutes(time);
+    return ranges.some((range) => {
+      const startMinutes = this.timeToMinutes(range.start);
+      const endMinutes = this.timeToMinutes(range.end);
+      return timeMinutes >= startMinutes && timeMinutes <= endMinutes;
+    });
+  }
 
-    logger.info(`Checking booked slots between ${startOfDay} and ${endOfDay}`);
-
-    const query = {
-      'pickup.date': {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
-      status: { $nin: ['cancelled'] },
-    };
-
-    // Exclude the current booking if ID is provided
-    if (excludeBookingId) {
-      query._id = { $ne: excludeBookingId };
+  generateTimeSlots(ranges) {
+    const slots = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        if (this.isTimeInRanges(time, ranges)) {
+          slots.push(time);
+        }
+      }
     }
-
-    const bookings = await Booking.find(query).select('pickup.time');
-    const bookedSlots = bookings.map((booking) => booking.pickup.time);
-    logger.info(`Found ${bookedSlots.length} booked slots: ${bookedSlots.join(', ')}`);
-
-    return bookedSlots;
+    logger.info(`Generated ${slots.length} time slots`);
+    return slots;
   }
 
   async getAvailableTimeSlots(date) {
     try {
       const requestedDate = moment(date);
-      logger.info(`Parsed date: ${requestedDate.format('YYYY-MM-DD')}`);
+      logger.info(`Getting available time slots for date: ${requestedDate.format('YYYY-MM-DD')}`);
 
       if (!requestedDate.isValid()) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid date format. Use YYYY-MM-DD');
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid date format');
       }
 
-      const today = moment().startOf('day');
-      if (requestedDate.isBefore(today)) {
+      // Get schedule for the day of week
+      const dayOfWeek = requestedDate.day();
+      const schedule = await Schedule.findOne({ dayOfWeek, isEnabled: true });
+
+      logger.info(`Found schedule for day ${dayOfWeek}:`, schedule);
+
+      if (!schedule || !schedule.timeRanges.length) {
+        logger.info(`No schedule found for day ${dayOfWeek}`);
         return { availableSlots: [] };
       }
 
-      if (requestedDate.isAfter(moment().add(3, 'months'))) {
-        return { availableSlots: [] };
-      }
+      // Generate all possible slots for the day
+      const allSlots = this.generateTimeSlots(schedule.timeRanges);
 
-      let availableSlots = this.generateTimeSlots();
-      const bookedSlots = await this.getBookedSlots(requestedDate.toDate());
-      availableSlots = availableSlots.filter((slot) => !bookedSlots.includes(slot));
+      // Get booked slots
+      const startOfDay = requestedDate.startOf('day').toDate();
+      const endOfDay = requestedDate.endOf('day').toDate();
 
-      if (requestedDate.isSame(moment(), 'day')) {
-        const twoHoursFromNow = moment().add(2, 'hours');
-        availableSlots = availableSlots.filter((slot) => {
-          const slotTime = moment(`${requestedDate.format('YYYY-MM-DD')} ${slot}`, 'YYYY-MM-DD HH:mm');
-          return slotTime.isAfter(twoHoursFromNow);
-        });
-      }
+      const bookings = await Booking.find({
+        'pickup.date': {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
+        status: { $nin: ['cancelled'] },
+      }).select('pickup.time');
 
+      const bookedTimes = bookings.map((booking) => booking.pickup.time);
+      logger.info(`Found ${bookedTimes.length} booked slots for ${requestedDate.format('YYYY-MM-DD')}`);
+
+      // Filter out booked slots and past times
+      const availableSlots = allSlots.filter((time) => {
+        // Check if slot is not booked
+        if (bookedTimes.includes(time)) {
+          logger.debug(`Slot ${time} is already booked`);
+          return false;
+        }
+
+        // If date is today, filter out past times plus 2 hours buffer
+        if (requestedDate.isSame(moment(), 'day')) {
+          const slotTime = moment(`${requestedDate.format('YYYY-MM-DD')} ${time}`);
+          const isAfterBuffer = slotTime.isAfter(moment().add(2, 'hours'));
+          if (!isAfterBuffer) {
+            logger.debug(`Slot ${time} is in the past or within 2 hour buffer`);
+          }
+          return isAfterBuffer;
+        }
+
+        return true;
+      });
+
+      logger.info(`Returning ${availableSlots.length} available slots`);
       return { availableSlots };
     } catch (error) {
       logger.error('Error in getAvailableTimeSlots:', error);
@@ -84,77 +101,70 @@ class AvailabilityService {
     }
   }
 
-  async checkTimeSlotAvailability(date, time, excludeBookingId = null) {
+  async checkTimeSlotAvailability(date, time) {
     try {
       logger.info(`Checking availability for date: ${date}, time: ${time}`);
 
-      const requestedDate = moment(date);
-      if (!requestedDate.isValid()) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid date format. Use YYYY-MM-DD');
-      }
+      const requestedDate = moment(date).startOf('day');
+      const dayOfWeek = requestedDate.day();
 
-      if (!/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid time format. Use HH:mm');
-      }
-
-      const timeHour = parseInt(time.split(':')[0]);
-      if (timeHour < 17 || timeHour >= 22) {
+      // Check if time slot is within schedule
+      const schedule = await Schedule.findOne({ dayOfWeek, isEnabled: true });
+      if (!schedule || !this.isTimeInRanges(time, schedule.timeRanges)) {
+        logger.info(`Time ${time} is not within scheduled ranges for day ${dayOfWeek}`);
         return false;
       }
 
-      const query = {
+      // Check if slot is already booked
+      const booking = await Booking.findOne({
         'pickup.date': requestedDate.toDate(),
         'pickup.time': time,
         status: { $nin: ['cancelled'] },
-      };
+      });
 
-      // Exclude the current booking if ID is provided
-      if (excludeBookingId) {
-        query._id = { $ne: excludeBookingId };
-      }
-
-      const existingBooking = await Booking.findOne(query);
-      return !existingBooking;
+      const isAvailable = !booking;
+      logger.info(`Time slot availability: ${isAvailable}`);
+      return isAvailable;
     } catch (error) {
       logger.error('Error in checkTimeSlotAvailability:', error);
       throw error;
     }
   }
 
-  async bookTimeSlot(date, time, bookingId) {
+  async updateSchedule(dayOfWeek, timeRanges, isEnabled = true) {
     try {
-      logger.info(`Booking time slot - Date: ${date}, Time: ${time}, Booking: ${bookingId}`);
+      logger.info(`Updating schedule for day ${dayOfWeek}`, { timeRanges, isEnabled });
 
-      // When checking availability, exclude the current booking
-      const isAvailable = await this.checkTimeSlotAvailability(date, time, bookingId);
-      if (!isAvailable) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Time slot is not available');
-      }
+      const schedule = await Schedule.findOneAndUpdate(
+        { dayOfWeek },
+        {
+          $set: {
+            timeRanges,
+            isEnabled,
+          },
+        },
+        {
+          new: true,
+          upsert: true,
+        }
+      );
 
-      // No need to do anything else since the booking is already created
-      logger.info(`Successfully booked time slot for booking ${bookingId}`);
-      return true;
+      logger.info(`Successfully updated schedule for day ${dayOfWeek}`);
+      return schedule;
     } catch (error) {
-      logger.error('Error booking time slot:', error);
+      logger.error('Error in updateSchedule:', error);
       throw error;
     }
   }
 
-  async releaseTimeSlot(bookingId) {
+  async getFullSchedule() {
     try {
-      logger.info(`Releasing time slot for booking: ${bookingId}`);
-
-      const booking = await Booking.findById(bookingId);
-      if (!booking) {
-        throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
-      }
-
-      // Since we're not using a separate TimeSlot collection,
-      // we just need to verify the booking exists
-      logger.info(`Successfully released time slot for booking ${bookingId}`);
-      return true;
+      logger.info('Fetching full schedule');
+      const schedule = await Schedule.find().sort('dayOfWeek');
+      logger.info(`Found ${schedule.length} schedule entries`);
+      return schedule;
     } catch (error) {
-      logger.error('Error releasing time slot:', error);
+      logger.error('Error in getFullSchedule:', error);
       throw error;
     }
   }
