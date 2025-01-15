@@ -23,7 +23,7 @@ class AvailabilityService {
   generateTimeSlots(ranges) {
     const slots = [];
     for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+      for (let minute = 0; minute < 60; minute += 60) {
         const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
         if (this.isTimeInRanges(time, ranges)) {
           slots.push(time);
