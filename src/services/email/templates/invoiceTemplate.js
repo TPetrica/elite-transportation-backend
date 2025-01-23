@@ -64,9 +64,6 @@ const invoiceTemplate = ({
         <td style="width: 50%; vertical-align: top; padding: 20px;">
           <div style="font-size: 14px; color: #525252;">
             <div style="font-weight: bold;">${supplier.name}</div>
-            <div>${supplier.address}</div>
-            ${supplier.city && supplier.postCode ? `<div>${supplier.city}, ${supplier.postCode}</div>` : ''}
-            ${supplier.country ? `<div>${supplier.country}</div>` : ''}
           </div>
         </td>
         <td style="width: 50%; vertical-align: top; text-align: right; padding: 20px;">
