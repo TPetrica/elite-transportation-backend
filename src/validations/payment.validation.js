@@ -1,5 +1,4 @@
 const Joi = require('joi');
-const { objectId } = require('./custom.validation');
 
 const createCheckoutSession = {
   body: Joi.object().keys({
@@ -26,16 +25,16 @@ const createCheckoutSession = {
         time: Joi.string().required(),
         flightNumber: Joi.string().allow(''),
         flightTime: Joi.string().allow('', null),
-        isCustom: Joi.boolean().optional(), // Added this field
-      }),
+        isCustom: Joi.boolean().optional(),
+      }).unknown(false), // This ensures no extra fields like isCottonwood
       dropoff: Joi.object({
         address: Joi.string().required(),
         coordinates: Joi.object({
           lat: Joi.number().required(),
           lng: Joi.number().required(),
         }),
-        isCustom: Joi.boolean().optional(), // Added this field
-      }),
+        isCustom: Joi.boolean().optional(),
+      }).unknown(false), // This ensures no extra fields like isCottonwood
       distance: Joi.object({
         km: Joi.number().required(),
         miles: Joi.number().required(),
