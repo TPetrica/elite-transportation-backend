@@ -1,135 +1,107 @@
 const { google } = require('googleapis');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const logger = require('../config/logger');
-const httpStatus = require('http-status');
-const ApiError = require('../utils/ApiError');
 
-const credentials = {
-  clientEmail: 'booking-calendar@luxury-transportation-444520.iam.gserviceaccount.com',
-  privateKey:
-    '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCUY/ubxinlIr5z\nP3QaA67zxcXoER6f9Kfco6ECgkx8TX4uGiWw7QWNMabZ8mht6mIxqSVKjR4w29zT\nF+spOvKxuLHaLkxFGLiDb5BEYlz1gbn2EsVwcpGiNwn1txl4NYhROSn2nvFMCY23\nEJ/Dx59K/d8V6HaSkPGOZmpDp5PYmHDYh1akGi6ZxOBDICQpEOZjgQm36FlwV0PL\nIlEkjWX3Ce90VzXPzdIRvb8i6+/BA4ttOUT01FtjDh7sJuxazgS4764EYzF+s+HP\ndQEGoYY9a+EfvlYOXu0fsg9FpiHhWJKWnVA92FmXvZ/YsoyFoSUeGa6q4//PkYl1\nYEOwSu+9AgMBAAECggEABIcO4YdeC8NXApiiF/Th0H/0d/HP/6zbRTK/yw/cJMod\nnfl8X0CJc/4h5E6ZMTVbKxRluZsX4shOHZtl1PDUAEvYLyJM1OMaQwRhdYrpNttS\ntikyIKpA5Z8bEGmaDUj0aW2TzOt+sEWD6CQQw9qiOYt6cKZn1m3EDlvW02lKJQh3\nHkEfb7IjA0U++PcImqGZ+QtxEVu/1Rh5nqETTB4x0/FRIxye5G6JX3ZnlzRreMrM\ntuX7hxbxab6EO+cDdQkfvjGz1ZnWGnnpwLTpE9d6hwukT9G9PfEHvMLgLgtug52s\npWzp4H/XP5yeSiMq9rRqilFLKl39uP9FFSm8ix307wKBgQDEx9A8hG07Q9TStIoZ\nQfQRuhqPs9flWg2u3yPNo5ugUTVmZPR7grE95MIdNf0qkmRg93aYtb/cLMO/oAzJ\ntkLmxBLGcU0pew96h/X+aks4IAlMXysNG0Jk3jbvqEKlCOybx8D6doK079scqXGJ\nlwCzpzI+9nkZTHPZXHTYvtNLJwKBgQDBDCda/6j2UEAJk07aFwgZQ6yTwp/RIZet\nhIoR+k5R1OkdqAW3lasNh3mou34OqaBCpUSdBDTjClglE+G3NZekWys86gHgdQqs\nUbP4EO6izNfFQ7HajglZKYacUGrKsyRxXzrDtqC7zlECs0DI/u/UeAq+tDg/e96K\nQNRh5MAMewKBgQCv/yJArhRgGDflyDFni7R2kmOlOS2UZOmuCMcl6fmL9nXzQcHk\nIazSdaIjrCDlDY+Xply9EnkpvCPLZKNrWYcWjDFaqQVhXz4l0ipyxLDH3udSFiAU\nFdhZDOJHkM8iegvc/Fid6pbWq1vmk6oHbDXleFmZNKp0tQs8UdPz8yBZqwKBgCBB\n7qWXCN23xSuUcN2icZj/JOw/3kKs0VKOTh/46nNkF1v8QpBNsxp8o8idI9BBaeUZ\nBqESHeA+T0JK0zGxA9jT3yK7m3qtNA5dTKxL8ARGJFvzFtoFV+yNMtAV4/JhAtrq\n5b/kWXFoZUMFPvMXHm4rbOg25xs8kJAbiyGcfrbXAoGAapkwG7V+9cUE+PalX1Pq\nKG5Xz6K/fBSYu4R8C93xrVpTAoTFz2qBvBQnjy0TWcyPOaQoF3sAMa5os/5M/dMz\nfkpbCHLJdVZmE2HXq9r8ZiBbRsMVtFva/ec9oZoounhTevn3ZDwka2g1WwBSDpt/\nhqR+wZBbZafQn7WDrNyhWfM=\n-----END PRIVATE KEY-----\n',
-  calendarId: 'da4bb71699496f6041aaa66db7ed471747bb3f398766133eb1c2033f2f225ba2@group.calendar.google.com',
+const CALENDAR_CREDENTIALS = {
+  type: 'service_account',
+  project_id: 'elite-transportation-450818',
+  private_key_id: '42b1d519f894d739f203aef96dd3f317efbdae8a',
+  private_key:
+    '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCO8uAGM4dZELRr\nn3tZ9tHGvfRsK7o5k4uWPK0MdF2t+60ls6aCsWJxywVeIU7KbCYdSb85bWbGnX3H\nt05O5tW0tRJkbUh1rBLrTdvzVz2DI2kxtT6DFR7XsEuBOVh9/9/IW9woNRpnnR3H\n5c9JlFme0SEi5c9gDc2J37570c5TlIL15Vd1FiLuxbFagkjiNDCEuw2fzkfPN77u\nmlKyIK3TPyJGkYcg04ai9eEZz+hwskzSH5fr7s0DrZBc5LzCN9wR1EcuZP47w6E5\n/Vk2nOiKsLKs6zA71lYVY02kao1rXVAm5fNS7WT1twG3NWm/WFag5+zHGSerQTBs\nIeh1LXdjAgMBAAECggEADguIqFioFpUAwnGdKzXdiaNAoIoxVhaMSKV13pCRDcGk\nfbJSN2rEqz072Jz5gq5allZtyUTZrBptm9GuX4E9rm97ZaOj0sVRPI5eAIw/Tnhh\nuGZq7x0u9m6WFJXKVI2Z8rPX2e7RxSwXm3xAatB+d7oWK+QcL9Swr7hsnPonGr4J\n+9NHoMPXogIkiRddytxT24mMLsHZg/gNthf5HnjjO14QksDdTnvWK0Rc0VIAvS93\nV6r0Bc8xJl8ZiEu7lLssQFneT4qfqQxWr0SwuUooaf/KpgRoXsysGe4NC7lp3aGk\nUVaPmM1+9Zadu4JR9I+2F6vqwwDcpPOl0+VD1qxiiQKBgQDGmhOFemWAW8vGnpoO\nbbF6UAUoMCCms59PjjnGv7zMgXW4c0cR6ggQtmBWKGVRyt4mTZNwKpp8jjo862J4\nDZ+aTqUHORZPcXTX3o5wYZLc4hy4c1DfeuGHoi4tvzbZ8YTGov7IQod5XHMRT7++\n8f+Z3ncXb1biYxZsrYEz1ZbmKwKBgQC4QzMiG2rkgooFHCKwRY2cEj0WNlPyfzkV\nr6a6iYgXI9D0zVfTtV/YsF1gXOtCN4kVA0sXrtxG9gboGQvZ8LXFMncmZ6Z1IS0a\ndpQrIJToV3kLBD2N5d5hiFGjQqiHeFrLnkDV3T9YjG8pZ1TnCBgB3+S6D0OldEJF\nBLjE2LkPqQKBgDwPHjYwZH+jwwUms3oHjDNr/ZNAsq8XBOd/IFPNaiACSoJkQirV\ntmivboS/pJxOmE3HCf5Ss/NU46HGoTmjDRASFnAPwIJ30hjyEetEZrBrpLnXDa73\nrzpgPkzRVZolIr0bT6dqDyQRZC7pChiJgH2cvDEXF5RQ2Ng2xCrTvdWPAoGBAKFQ\ne5CNjkxVmD2W/ytxCOOs9/vdPisbhD9fEslWJGWVvpbCuvQmYq3S4Ty+vFuxQPq7\ncl9ef4xEUZGac8yuNoRYhQWDUrBShikXzOng0VyDT/38DWOP7dtXO5mBfwdyr5J5\njmttEcsUzzDhPOwyIsppV9YoDOHp4SaJVrVGwuVZAoGARm/l6cPUJxWHmc6J8M6s\nzEUfm25bQNubMtsq9zTXzbg5A0s/EG1vHT/At6Un1gZrmPfmDMDolJo5Fn5yDaxP\n863G1OSHNszFPHXAFsBwj/smK6RPbbzPf8hJPVA9qIMnTBkk+L20ZTbDbsTB4e8R\nMnOegyvOGICkk4k2Gt85EBU=\n-----END PRIVATE KEY-----\n',
+  client_email: 'elite-transportation@elite-transportation-450818.iam.gserviceaccount.com',
+  client_id: '112764763379658178421',
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url:
+    'https://www.googleapis.com/robot/v1/metadata/x509/elite-transportation%40elite-transportation-450818.iam.gserviceaccount.com',
+  universe_domain: 'googleapis.com',
 };
 
+const CALENDAR_ID = 'elitetransportationpc@gmail.com';
 class CalendarService {
   constructor() {
     try {
-      // Initialize auth using credentials
-      this.auth = new google.auth.JWT(credentials.clientEmail, null, credentials.privateKey, [
-        'https://www.googleapis.com/auth/calendar',
-      ]);
+      this.auth = new google.auth.GoogleAuth({
+        credentials: CALENDAR_CREDENTIALS,
+        scopes: ['https://www.googleapis.com/auth/calendar'],
+      });
 
       this.calendar = google.calendar({
         version: 'v3',
         auth: this.auth,
       });
 
-      this.calendarId = credentials.calendarId;
+      this.calendarId = CALENDAR_ID;
+
+      logger.info('Calendar service initialized');
     } catch (error) {
       logger.error('Failed to initialize calendar service:', error);
       throw error;
     }
   }
 
-  async getAvailableTimeSlots(date) {
+  async createEvent(booking) {
     try {
-      logger.info(`Getting available time slots for date: ${date}`);
+      // Format the date from the Date object
+      const pickupDate = moment(booking.pickup.date).format('YYYY-MM-DD');
+      const pickupTime = booking.pickup.time;
 
-      const startTime = moment(date).startOf('day').add(17, 'hours');
-      const endTime = moment(date).startOf('day').add(22, 'hours');
+      // Create the datetime
+      const pickupDateTime = moment(`${pickupDate} ${pickupTime}`, 'YYYY-MM-DD HH:mm');
 
-      logger.info(`Time range: ${startTime.format('YYYY-MM-DD HH:mm')} to ${endTime.format('YYYY-MM-DD HH:mm')}`);
-
-      // Get existing events for the day
-      logger.info(`Fetching events from Google Calendar for ${date}`);
-      const response = await this.calendar.events.list({
-        calendarId: this.calendarId,
-        timeMin: startTime.toISOString(),
-        timeMax: endTime.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
+      logger.info('Creating event with datetime:', {
+        originalDate: booking.pickup.date,
+        formattedDate: pickupDate,
+        time: pickupTime,
+        combined: pickupDateTime.format(),
       });
 
-      const events = response.data.items;
-      logger.info(`Found ${events.length} existing events for the day`);
-
-      // Map busy slots from events
-      const busySlots = events.map((event) => ({
-        start: moment(event.start.dateTime),
-        end: moment(event.end.dateTime),
-      }));
-
-      logger.info(
-        'Busy slots:',
-        busySlots.map((slot) => ({
-          start: slot.start.format('HH:mm'),
-          end: slot.end.format('HH:mm'),
-        }))
-      );
-
-      // Generate all possible time slots
-      const slots = [];
-      let currentSlot = moment(startTime);
-
-      logger.info('Generating available time slots...');
-      const now = moment();
-      const selectedDate = moment(date).startOf('day');
-      const today = moment().startOf('day');
-
-      while (currentSlot < endTime) {
-        const currentTime = currentSlot.format('HH:mm');
-        logger.info(`Checking slot: ${currentTime}`);
-
-        const isAvailable = this.isSlotAvailable(currentSlot, busySlots);
-        // Only apply the 2-hour buffer for today's slots
-        const isValid = selectedDate.isSame(today) ? currentSlot.isAfter(now.add(2, 'hours')) : true;
-
-        logger.info(`Slot ${currentTime} - Available: ${isAvailable}, Valid: ${isValid}`);
-
-        if (isAvailable && isValid) {
-          slots.push(currentTime);
-          logger.info(`Added slot: ${currentTime}`);
-        }
-
-        currentSlot = moment(currentSlot).add(30, 'minutes');
+      if (!pickupDateTime.isValid()) {
+        throw new Error(`Invalid date/time format. Date: ${pickupDate}, Time: ${pickupTime}`);
       }
 
-      logger.info(`Total available slots found: ${slots.length}`);
-      logger.info('Available slots:', slots);
+      const endDateTime = moment(pickupDateTime).add(30, 'minutes');
 
-      return slots;
-    } catch (error) {
-      logger.error('Error fetching calendar availability:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to fetch available time slots');
-    }
-  }
-
-  isSlotAvailable(slotTime, busySlots) {
-    const slotStart = moment(slotTime);
-    const slotEnd = moment(slotTime).add(30, 'minutes');
-
-    return !busySlots.some((busy) => {
-      return (
-        (slotStart.isSameOrAfter(busy.start) && slotStart.isBefore(busy.end)) ||
-        (slotEnd.isAfter(busy.start) && slotEnd.isSameOrBefore(busy.end)) ||
-        (slotStart.isSameOrBefore(busy.start) && slotEnd.isSameOrAfter(busy.end))
-      );
-    });
-  }
-
-  async createCalendarEvent(booking) {
-    try {
       const event = {
-        summary: `Booking #${booking.bookingNumber}`,
-        description: `Pickup: ${booking.pickup.address}\nDropoff: ${booking.dropoff.address}\nPassenger: ${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
+        summary: `Ride #${booking.bookingNumber}`,
+        description: `
+Pickup: ${booking.pickup.address}
+Dropoff: ${booking.dropoff.address}
+Flight Number: ${booking.pickup.flightNumber || 'N/A'}
+
+Passenger Details:
+- Name: ${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}
+- Phone: ${booking.passengerDetails.phone || 'N/A'}
+- Email: ${booking.email}
+- Passengers: ${booking.passengerDetails.passengers}
+- Luggage: ${booking.passengerDetails.luggage}
+${
+  booking.passengerDetails.specialRequirements
+    ? '- Special Requirements: ' + booking.passengerDetails.specialRequirements
+    : ''
+}
+
+Service: ${booking.service}
+Distance: ${booking.distance.miles} miles
+Duration: ${booking.duration}
+Amount: $${booking.payment.amount}
+        `.trim(),
         start: {
-          dateTime: moment(`${booking.pickup.date} ${booking.pickup.time}`).toISOString(),
-          timeZone: 'UTC',
+          dateTime: pickupDateTime.format('YYYY-MM-DDTHH:mm:ss'),
+          timeZone: 'America/New_York',
         },
         end: {
-          dateTime: moment(`${booking.pickup.date} ${booking.pickup.time}`).add(30, 'minutes').toISOString(),
-          timeZone: 'UTC',
+          dateTime: endDateTime.format('YYYY-MM-DDTHH:mm:ss'),
+          timeZone: 'America/New_York',
         },
+        // Color coding based on service
+        colorId:
+          booking.service === 'from-airport'
+            ? '9' // Purple for airport pickups
+            : booking.service === 'to-airport'
+            ? '7' // Red for airport dropoffs
+            : '1', // Blue for others
       };
 
       const response = await this.calendar.events.insert({
@@ -137,90 +109,22 @@ class CalendarService {
         resource: event,
       });
 
-      return response.data;
-    } catch (error) {
-      logger.error('Error creating calendar event:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to create calendar event');
-    }
-  }
-
-  async updateCalendarEvent(eventId, updatedBooking) {
-    try {
-      const event = {
-        summary: `Booking #${updatedBooking.bookingNumber}`,
-        description: `Pickup: ${updatedBooking.pickup.address}\nDropoff: ${updatedBooking.dropoff.address}\nPassenger: ${updatedBooking.passengerDetails.firstName} ${updatedBooking.passengerDetails.lastName}`,
-        start: {
-          dateTime: moment(`${updatedBooking.pickup.date} ${updatedBooking.pickup.time}`).toISOString(),
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: moment(`${updatedBooking.pickup.date} ${updatedBooking.pickup.time}`).add(30, 'minutes').toISOString(),
-          timeZone: 'UTC',
-        },
-      };
-
-      const response = await this.calendar.events.update({
-        calendarId: this.calendarId,
-        eventId: eventId,
-        resource: event,
+      logger.info('Calendar event created successfully:', {
+        bookingNumber: booking.bookingNumber,
+        eventId: response.data.id,
+        link: response.data.htmlLink,
       });
 
       return response.data;
     } catch (error) {
-      logger.error('Error updating calendar event:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to update calendar event');
-    }
-  }
-
-  async deleteCalendarEvent(eventId) {
-    try {
-      await this.calendar.events.delete({
-        calendarId: this.calendarId,
-        eventId: eventId,
+      logger.error('Error creating calendar event:', {
+        error: error.message,
+        bookingNumber: booking.bookingNumber,
+        pickupDate: booking.pickup.date,
+        pickupTime: booking.pickup.time,
+        stack: error.stack,
       });
-    } catch (error) {
-      logger.error('Error deleting calendar event:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to delete calendar event');
-    }
-  }
-
-  async testConnection() {
-    try {
-      const now = moment();
-      const response = await this.calendar.events.list({
-        calendarId: this.calendarId,
-        timeMin: now.toISOString(),
-        maxResults: 10,
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      return {
-        success: true,
-        events: response.data.items,
-      };
-    } catch (error) {
-      logger.error('Calendar test failed:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Calendar connection failed: ${error.message}`);
-    }
-  }
-
-  async checkTimeSlotAvailability(date, time) {
-    try {
-      const startTime = moment(`${date} ${time}`);
-      const endTime = moment(startTime).add(30, 'minutes');
-
-      const response = await this.calendar.events.list({
-        calendarId: this.calendarId,
-        timeMin: startTime.toISOString(),
-        timeMax: endTime.toISOString(),
-        singleEvents: true,
-      });
-
-      return response.data.items.length === 0;
-    } catch (error) {
-      logger.error('Error checking time slot availability:', error);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to check time slot availability');
+      return null;
     }
   }
 }

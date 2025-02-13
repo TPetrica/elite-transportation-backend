@@ -1,15 +1,12 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { paymentService, bookingService, smsService } = require('../services');
+const { paymentService, bookingService, smsService, calendarService } = require('../services');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const { sendInvoiceEmail } = require('../services/email.service');
 const { Payment } = require('../models');
 
-/**
- * Creates a checkout session and associated records
- */
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
 
@@ -171,6 +168,9 @@ const handleWebhook = async (req, res) => {
             'metadata.bookingNumber': booking.bookingNumber,
             stripePaymentIntentId: session.payment_intent,
           });
+
+          // Create calendar event
+          await calendarService.createEvent(booking);
 
           // Send notifications
           try {
