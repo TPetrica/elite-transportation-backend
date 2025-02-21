@@ -17,6 +17,8 @@ const { calculateTripPrice } = require('../utils/priceCalculator');
  * @returns {Promise<Booking>}
  */
 const createBooking = async (bookingBody) => {
+  console.log('bookingBody', bookingBody);
+
   try {
     logger.info('Starting booking creation process');
 
@@ -68,25 +70,76 @@ const createBooking = async (bookingBody) => {
 
     // Send confirmation email
     try {
+      // Prepare complete email data
       const emailData = {
+        // Basic booking info
         bookingNumber: booking.bookingNumber,
         amount: booking.payment.amount,
-        pickupDetails: {
+
+        // Trip details
+        pickup: {
           date: booking.pickup.date,
           time: booking.pickup.time,
           address: booking.pickup.address,
+          coordinates: booking.pickup.coordinates,
+          flightNumber: booking.pickup.flightNumber || '',
+          flightTime: booking.pickup.flightTime || '',
+          isCustom: booking.pickup.isCustom || false,
         },
-        dropoffDetails: {
+        dropoff: {
           address: booking.dropoff.address,
+          coordinates: booking.dropoff.coordinates,
+          isCustom: booking.dropoff.isCustom || false,
         },
-        passengerDetails: booking.passengerDetails,
+
+        // Trip metrics
+        distance: booking.distance,
+        duration: booking.duration,
+
+        // Service info
         service: booking.service,
-        extras: booking.extras,
+
+        // Passenger details
+        passengerDetails: {
+          firstName: booking.passengerDetails.firstName,
+          lastName: booking.passengerDetails.lastName,
+          phone: booking.passengerDetails.phone,
+          passengers: booking.passengerDetails.passengers,
+          luggage: booking.passengerDetails.luggage,
+          email: booking.passengerDetails.email,
+          notes: booking.passengerDetails.notes || '',
+          specialRequirements: booking.passengerDetails.specialRequirements || '',
+        },
+
+        // Billing details
+        billingDetails: {
+          firstName: booking.billingDetails.firstName,
+          lastName: booking.billingDetails.lastName,
+          company: booking.billingDetails.company || '',
+          address: booking.billingDetails.address,
+          country: booking.billingDetails.country,
+          city: booking.billingDetails.city,
+          zipCode: booking.billingDetails.zipCode,
+          email: booking.billingDetails.email || '',
+        },
+
+        // Payment details
+        payment: {
+          method: booking.payment.method,
+          amount: booking.payment.amount,
+          status: booking.payment.status,
+          currency: 'USD',
+        },
+
+        // Optional extras
+        extras: booking.extras || [],
       };
 
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
+      logger.info('Booking confirmation email sent successfully');
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);
+      throw new Error('Failed to send confirmation email: ' + error.message);
     }
 
     return booking;

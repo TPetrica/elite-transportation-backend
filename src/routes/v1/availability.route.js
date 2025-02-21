@@ -8,12 +8,10 @@ const router = express.Router();
 
 // Public routes
 router.get('/time-slots', validate(availabilityValidation.getTimeSlots), availabilityController.getAvailableTimeSlots);
-
 router.get('/check', validate(availabilityValidation.checkAvailability), availabilityController.checkTimeSlotAvailability);
 
 // Protected routes (require authentication)
 router.get('/schedule', auth('manageSchedule'), availabilityController.getFullSchedule);
-
 router.put(
   '/schedule',
   auth('manageSchedule'),

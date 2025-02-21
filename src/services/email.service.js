@@ -68,21 +68,13 @@ const sendEmail = async (to, subject, text, html, attachments = []) => {
  * @returns {Promise}
  */
 const sendBookingConfirmationEmail = async (to, bookingData) => {
+  console.log('to', to);
+  console.log('bookingData', bookingData);
+
   try {
     logger.debug('Sending booking confirmation with data:', bookingData);
 
-    // Validate required data
-    if (!bookingData) {
-      throw new Error('Booking data is required');
-    }
-
-    if (!bookingData.pickupDetails?.date || !bookingData.pickupDetails?.time) {
-      throw new Error('Pickup details are missing');
-    }
-
-    if (!bookingData.pickupDetails?.address || !bookingData.dropoffDetails?.address) {
-      throw new Error('Address details are missing');
-    }
+    if (!bookingData) throw new Error('Booking data is required');
 
     const getServiceName = (service) => {
       switch (service) {
@@ -90,19 +82,634 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
           return 'Airport Pickup Service';
         case 'to-airport':
           return 'Airport Drop-off Service';
+        case 'canyons':
+          return 'Cottonwood Canyons Transfer';
+        case 'hourly':
+          return 'Hourly Service';
+        case 'per-person':
+          return 'Per Person Service';
         default:
           return 'Transportation Service';
       }
     };
 
-    const pickupDate = moment(bookingData.pickupDetails.date).format('MMMM Do YYYY');
-    const extras =
-      bookingData.extras?.length > 0
-        ? bookingData.extras
-            .filter((extra) => extra && extra.item && typeof extra.price === 'number')
-            .map((extra) => `${extra.item.name || 'Item'} x${extra.quantity || 1} - $${extra.price.toFixed(2)}`)
-            .join('\\n')
-        : 'No extras added';
+    const pickupDate = moment(bookingData.pickup.date).format('MMMM Do YYYY');
+    const pickupTime = moment(bookingData.pickup.time, 'HH:mm').format('h:mm A');
+
+    const styles = `
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        color: #333;
+        background-color: #f5f5f5;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .main-content {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+
+      .header {
+        background: #1a1a1a;
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header img {
+        height: 48px;
+        margin-bottom: 15px;
+      }
+
+      .header h2 {
+        margin: 0;
+        color: white;
+        font-size: 24px;
+      }
+
+      .header p {
+        margin: 10px 0 0;
+        color: rgba(255,255,255,0.8);
+      }
+
+      .booking-header {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 1px solid #e1e1e1;
+      }
+
+      .booking-number {
+        font-size: 20px;
+        color: #1a1a1a;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .booking-number span {
+        color: #666;
+        font-size: 16px;
+      }
+
+      .content-section {
+        padding: 30px;
+      }
+
+      .trip-header {
+        background: #4CAF50;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 6px 6px 0 0;
+        margin: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .trip-content {
+        background: white;
+        border: 1px solid #e1e1e1;
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        padding: 20px;
+        margin-bottom: 30px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+
+      .trip-details .time {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin-bottom: 20px;
+      }
+
+      .address-section {
+        margin-bottom: 20px;
+      }
+
+      .address-label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .address {
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+
+      .passenger-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 6px;
+      }
+
+      .info-row {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e1e1e1;
+      }
+
+      .info-row:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      .info-label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .info-value {
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+
+      .trip-metadata {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e1e1e1;
+      }
+
+      .metadata-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .metadata-label {
+        color: #666;
+      }
+
+      .metadata-value {
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+
+      .airport-instructions {
+        background: #f8f9fa;
+        border: 1px solid #e1e1e1;
+        border-radius: 6px;
+        padding: 25px;
+        margin-top: 30px;
+      }
+
+      .airport-instructions h4 {
+        margin: 0 0 20px;
+        color: #1a1a1a;
+      }
+
+      .step {
+        margin-bottom: 20px;
+        padding-left: 30px;
+        position: relative;
+      }
+
+      .step:last-child {
+        margin-bottom: 0;
+      }
+
+      .step:before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 5px;
+        width: 20px;
+        height: 20px;
+        background: #4CAF50;
+        border-radius: 50%;
+      }
+
+      .step-title {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #1a1a1a;
+      }
+
+      .step p {
+        margin: 0;
+        color: #666;
+      }
+
+      .footer {
+        text-align: center;
+        padding: 30px;
+        background: #f8f9fa;
+        border-top: 1px solid #e1e1e1;
+        color: #666;
+      }
+
+      @media (max-width: 768px) {
+        .trip-content {
+          grid-template-columns: 1fr;
+        }
+        
+        .container {
+          padding: 10px;
+        }
+        
+        .content-section {
+          padding: 20px;
+        }
+      }
+    `;
+
+    const customerHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>${styles}</style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="main-content">
+            <div class="header">
+              <img src="cid:companyLogo" alt="Elite Transportation">
+              <h2>Your reservation is confirmed</h2>
+            </div>
+
+            <div class="booking-header">
+              <h3 class="booking-number">
+                Booking Confirmation ${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')} - ${getServiceName(
+      bookingData.service
+    )}
+              </h3>
+            </div>
+
+            <div class="content-section">
+              <h3 class="trip-header">
+                Trip Information - ${pickupDate}
+              </h3>
+              
+              <div class="trip-content">
+                <div class="trip-details">
+                  <div class="time">${pickupTime}</div>
+                  
+                  <div class="address-section">
+                    <div class="address-label">Pickup Location</div>
+                    <div class="address">${bookingData.pickup.address}</div>
+                  </div>
+
+                  <div class="address-section">
+                    <div class="address-label">Drop-off Location</div>
+                    <div class="address">${bookingData.dropoff.address}</div>
+                  </div>
+
+                  <div class="trip-metadata">
+                    <div class="metadata-row">
+                      <span class="metadata-label">Distance - </span>
+                      <span class="metadata-value">${bookingData.distance.miles} miles (${bookingData.distance.km} km)</span>
+                    </div>
+                    <div class="metadata-row">
+                      <span class="metadata-label">Duration - </span>
+                      <span class="metadata-value">${bookingData.duration}</span>
+                    </div>
+                    ${
+                      bookingData.pickup.flightNumber
+                        ? `
+                      <div class="metadata-row">
+                        <span class="metadata-label">Flight Number</span>
+                        <span class="metadata-value">${bookingData.pickup.flightNumber}</span>
+                      </div>
+                    `
+                        : ''
+                    }
+                  </div>
+                </div>
+
+                <div class="passenger-info">
+                  <div class="info-row">
+                    <div class="info-label">Passenger Name</div>
+                    <div class="info-value">${bookingData.passengerDetails.firstName} ${
+      bookingData.passengerDetails.lastName
+    }</div>
+                  </div>
+                  
+                  <div class="info-row">
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">${bookingData.passengerDetails.phone}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">${to}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Passengers</div>
+                    <div class="info-value">${bookingData.passengerDetails.passengers}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Luggage</div>
+                    <div class="info-value">${bookingData.passengerDetails.luggage}</div>
+                  </div>
+
+                  ${
+                    bookingData.passengerDetails.specialRequirements
+                      ? `
+                    <div class="info-row">
+                      <div class="info-label">Special Requirements</div>
+                      <div class="info-value">${bookingData.passengerDetails.specialRequirements}</div>
+                    </div>
+                  `
+                      : ''
+                  }
+                </div>
+              </div>
+
+              ${
+                bookingData.service === 'from-airport'
+                  ? `
+                <div class="airport-instructions">
+                  <h4>Welcome to Salt Lake City International Airport (SLC)!</h4>
+                  
+                  <div class="step">
+                    <div class="step-title">Step 1: Deplane and Follow the Signs</div>
+                    <p>Once you exit the plane, follow the signs for Arrivals and Baggage Claim. Look for overhead signage directing you to the baggage claim area.</p>
+                  </div>
+
+                  <div class="step">
+                    <div class="step-title">Step 2: Proceed to Baggage Claim Area</div>
+                    <p>Once you arrive at the baggage claim area, locate the carousel designated for your flight. Flight information will be displayed on monitors to help you find your assigned carousel. Wait for your bags to arrive. If your luggage does not appear after a reasonable amount of time, visit the baggage service desk for assistance.</p>
+                  </div>
+
+                  <div class="step">
+                    <div class="step-title">Step 3: Exit the Baggage Claim Area</div>
+                    <p>After collecting your luggage, exit the baggage claim area. Follow the "Ground Transportation" signs to reach the transportation options. The gate to exit on the ground transportation pick up area is located on the first floor.</p>
+                  </div>
+
+                  <div class="step">
+                    <div class="step-title">Step 4: Ground Transportation Area</div>
+                    <p>The Ground Transportation area is located just outside the terminal, on the first floor where you will find us. We will pick you up right outside the airport exit area (5A).</p>
+                  </div>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+
+            <div class="footer">
+              <strong>Need assistance?</strong><br>
+              Call us anytime at (435) 901-9158<br><br>
+              ELITE TRANSPORTATION<br>
+              elitetransportationpc@gmail.com
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const ownerHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>${styles}</style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="main-content">
+            <div class="header">
+              <img src="cid:companyLogo" alt="Elite Transportation">
+              <h2>New Booking Alert</h2>
+            </div>
+
+            <div class="booking-header">
+              <h3 class="booking-number">
+                Booking Confirmation ${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')} - ${getServiceName(
+      bookingData.service
+    )}
+              </h3>
+            </div>
+
+            <div class="content-section">
+              <h3 class="trip-header">
+                Trip Information - ${pickupDate}
+              </h3>
+              
+              <div class="trip-content">
+                <div class="trip-details">
+                  <div class="time">${pickupTime}</div>
+                  
+                  <div class="address-section">
+                    <div class="address-label">Pickup Location</div>
+                    <div class="address">${bookingData.pickup.address}</div>
+                  </div>
+
+                  <div class="address-section">
+                    <div class="address-label">Drop-off Location</div>
+                    <div class="address">${bookingData.dropoff.address}</div>
+                  </div>
+
+                  <div class="trip-metadata">
+                    <div class="metadata-row">
+                      <span class="metadata-label">Distance</span>
+                      <span class="metadata-value">${bookingData.distance.miles} miles (${bookingData.distance.km} km)</span>
+                    </div>
+                    <div class="metadata-row">
+                      <span class="metadata-label">Duration</span>
+                      <span class="metadata-value">${bookingData.duration}</span>
+                    </div>
+                    ${
+                      bookingData.pickup.flightNumber
+                        ? `
+                      <div class="metadata-row">
+                        <span class="metadata-label">Flight Number</span>
+                        <span class="metadata-value">${bookingData.pickup.flightNumber}</span>
+                      </div>
+                    `
+                        : ''
+                    }
+                    </div>
+                </div>
+
+                <div class="passenger-info">
+                  <div class="info-row">
+                    <div class="info-label">Passenger Name</div>
+                    <div class="info-value">${bookingData.passengerDetails.firstName} ${
+      bookingData.passengerDetails.lastName
+    }</div>
+                  </div>
+                  
+                  <div class="info-row">
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">${bookingData.passengerDetails.phone}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">${to}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Passengers</div>
+                    <div class="info-value">${bookingData.passengerDetails.passengers}</div>
+                  </div>
+
+                  <div class="info-row">
+                    <div class="info-label">Luggage</div>
+                    <div class="info-value">${bookingData.passengerDetails.luggage}</div>
+                  </div>
+
+                  ${
+                    bookingData.passengerDetails.specialRequirements
+                      ? `
+                    <div class="info-row">
+                      <div class="info-label">Special Requirements</div>
+                      <div class="info-value">${bookingData.passengerDetails.specialRequirements}</div>
+                    </div>
+                  `
+                      : ''
+                  }
+
+                  <div class="info-row">
+                    <div class="info-label">Billing Address</div>
+                    <div class="info-value">
+                      ${bookingData.billingDetails.address}<br>
+                      ${bookingData.billingDetails.city}, ${bookingData.billingDetails.country}<br>
+                      ${bookingData.billingDetails.zipCode}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              <strong>ELITE TRANSPORTATION</strong><br>
+              elitetransportationpc@gmail.com<br>
+              (435) 901-9158
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const customerText = `
+ELITE TRANSPORTATION - Booking Confirmation
+
+Booking Number: ${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}
+Service Type: ${getServiceName(bookingData.service)}
+
+TRIP INFORMATION - ${pickupDate}
+------------------------
+Time: ${pickupTime}
+
+Pickup Location:
+${bookingData.pickup.address}
+
+Drop-off Location:
+${bookingData.dropoff.address}
+
+Trip Details:
+- Distance: ${bookingData.distance.miles} miles (${bookingData.distance.km} km)
+- Duration: ${bookingData.duration}
+${bookingData.pickup.flightNumber ? `- Flight Number: ${bookingData.pickup.flightNumber}` : ''}
+
+PASSENGER DETAILS
+----------------
+Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
+Phone: ${bookingData.passengerDetails.phone}
+Email: ${to}
+Passengers: ${bookingData.passengerDetails.passengers}
+Luggage: ${bookingData.passengerDetails.luggage}
+${
+  bookingData.passengerDetails.specialRequirements
+    ? `Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
+    : ''
+}
+
+${
+  bookingData.service === 'from-airport'
+    ? `
+AIRPORT INSTRUCTIONS
+-------------------
+Welcome to Salt Lake City International Airport (SLC)!
+
+1. Deplane and Follow Signs
+   - Follow signs for Arrivals and Baggage Claim
+   - Look for overhead signage to baggage claim area
+
+2. Baggage Claim Area
+   - Locate your designated carousel
+   - Check flight information monitors
+   - Visit baggage service desk if needed
+
+3. Exit Baggage Claim
+   - Follow "Ground Transportation" signs
+   - Head to the first floor
+
+4. Ground Transportation Area
+   - Find us outside the terminal at exit area (5A)
+   - Look for Elite Transportation signage
+
+Need assistance? Call us at (435) 901-9158
+`
+    : ''
+}
+
+CONTACT INFORMATION
+------------------
+ELITE TRANSPORTATION
+Email: elitetransportationpc@gmail.com
+Phone: (435) 901-9158`;
+
+    const ownerText = `
+NEW BOOKING ALERT
+
+Booking Number: ${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}
+Service Type: ${getServiceName(bookingData.service)}
+
+TRIP INFORMATION - ${pickupDate}
+------------------------
+Time: ${pickupTime}
+
+Pickup Location:
+${bookingData.pickup.address}
+
+Drop-off Location:
+${bookingData.dropoff.address}
+
+Trip Details:
+- Distance: ${bookingData.distance.miles} miles (${bookingData.distance.km} km)
+- Duration: ${bookingData.duration}
+${bookingData.pickup.flightNumber ? `- Flight Number: ${bookingData.pickup.flightNumber}` : ''}
+
+PASSENGER DETAILS
+----------------
+Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
+Phone: ${bookingData.passengerDetails.phone}
+Email: ${to}
+Passengers: ${bookingData.passengerDetails.passengers}
+Luggage: ${bookingData.passengerDetails.luggage}
+${
+  bookingData.passengerDetails.specialRequirements
+    ? `Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
+    : ''
+}
+
+BILLING DETAILS
+--------------
+Address: ${bookingData.billingDetails.address}
+City: ${bookingData.billingDetails.city}
+Country: ${bookingData.billingDetails.country}
+Zip Code: ${bookingData.billingDetails.zipCode}`;
 
     const attachments = [
       {
@@ -112,182 +719,17 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       },
     ];
 
-    // Customer's email content
-    const customerHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
-        </div>
-        
-        <h2 style="color: #333;">Booking Confirmation</h2>
-        <p>Thank you for your booking!</p>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Booking Details</h3>
-          <p><strong>Booking Number:</strong> ${bookingData.bookingNumber}</p>
-          <p><strong>Date:</strong> ${pickupDate}</p>
-          <p><strong>Time:</strong> ${bookingData.pickupDetails.time}</p>
-          <p><strong>Pickup:</strong> ${bookingData.pickupDetails.address}</p>
-          <p><strong>Drop-off:</strong> ${bookingData.dropoffDetails.address}</p>
-        </div>
+    await sendEmail(
+      to,
+      `Booking Confirmation - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
+      customerText,
+      customerHtml,
+      attachments
+    );
 
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Service Details</h3>
-          <p><strong>Service Type:</strong> ${getServiceName(bookingData.service)}</p>
-          <p><strong>Passengers:</strong> ${bookingData.passengerDetails.passengers}</p>
-          <p><strong>Luggage:</strong> ${bookingData.passengerDetails.luggage}</p>
-          ${
-            bookingData.passengerDetails.specialRequirements
-              ? `<p><strong>Special Requirements:</strong> ${bookingData.passengerDetails.specialRequirements}</p>`
-              : ''
-          }
-          <p><strong>Extras:</strong></p>
-          <pre style="margin: 10px 0;">${extras}</pre>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Payment Details</h3>
-          <p><strong>Total Amount:</strong> $${bookingData.amount.toFixed(2)}</p>
-        </div>
-
-        <p style="color: #666; font-size: 14px;">
-          You will receive a payment confirmation and invoice once the payment is processed.
-        </p>
-
-        <div style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 20px; text-align: center; font-size: 12px; color: #525252;">
-          ELITE TRANSPORTATION
-          <span style="color: #cbd5e1; margin: 0 10px;">|</span>
-          elitetransportationpc@gmail.com
-          <span style="color: #cbd5e1; margin: 0 10px;">|</span>
-          +1 (435) 901-9158
-        </div>
-      </div>
-    `;
-
-    // Business owner's email content
-    const ownerHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="cid:companyLogo" style="height: 48px;" alt="Company Logo" />
-        </div>
-        
-        <h2 style="color: #333;">New Booking Alert</h2>
-        <p>A new booking has been received!</p>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Booking Details</h3>
-          <p><strong>Booking Number:</strong> ${bookingData.bookingNumber}</p>
-          <p><strong>Date:</strong> ${pickupDate}</p>
-          <p><strong>Time:</strong> ${bookingData.pickupDetails.time}</p>
-          <p><strong>Pickup:</strong> ${bookingData.pickupDetails.address}</p>
-          <p><strong>Drop-off:</strong> ${bookingData.dropoffDetails.address}</p>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Customer Details</h3>
-          <p><strong>Name:</strong> ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}</p>
-          <p><strong>Phone:</strong> ${bookingData.passengerDetails.phone}</p>
-          <p><strong>Email:</strong> ${to}</p>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Service Details</h3>
-          <p><strong>Service Type:</strong> ${getServiceName(bookingData.service)}</p>
-          <p><strong>Passengers:</strong> ${bookingData.passengerDetails.passengers}</p>
-          <p><strong>Luggage:</strong> ${bookingData.passengerDetails.luggage}</p>
-          ${
-            bookingData.passengerDetails.specialRequirements
-              ? `<p><strong>Special Requirements:</strong> ${bookingData.passengerDetails.specialRequirements}</p>`
-              : ''
-          }
-          <p><strong>Extras:</strong></p>
-          <pre style="margin: 10px 0;">${extras}</pre>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #28a745;">Payment Details</h3>
-          <p><strong>Total Amount:</strong> $${bookingData.amount.toFixed(2)}</p>
-        </div>
-      </div>
-    `;
-
-    const customerText = `
-      Booking Confirmation - #${bookingData.bookingNumber}
-
-      Thank you for your booking!
-
-      Booking Details:
-      - Booking Number: ${bookingData.bookingNumber}
-      - Date: ${pickupDate}
-      - Time: ${bookingData.pickupDetails.time}
-      - Pickup: ${bookingData.pickupDetails.address}
-      - Drop-off: ${bookingData.dropoffDetails.address}
-
-      Service Details:
-      - Service Type: ${getServiceName(bookingData.service)}
-      - Passengers: ${bookingData.passengerDetails.passengers}
-      - Luggage: ${bookingData.passengerDetails.luggage}
-      ${
-        bookingData.passengerDetails.specialRequirements
-          ? `- Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
-          : ''
-      }
-      
-      Extras:
-      ${extras}
-
-      Payment Details:
-      - Total Amount: $${bookingData.amount.toFixed(2)}
-
-      You will receive a payment confirmation and invoice once the payment is processed.
-
-      Contact:
-      ELITE TRANSPORTATION
-      elitetransportationpc@gmail.com
-      +1 (435) 901-9158
-    `;
-
-    const ownerText = `
-      New Booking Alert - #${bookingData.bookingNumber}
-
-      A new booking has been received!
-
-      Customer Details:
-      - Name: ${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}
-      - Phone: ${bookingData.passengerDetails.phone}
-      - Email: ${to}
-
-      Booking Details:
-      - Booking Number: ${bookingData.bookingNumber}
-      - Date: ${pickupDate}
-      - Time: ${bookingData.pickupDetails.time}
-      - Pickup: ${bookingData.pickupDetails.address}
-      - Drop-off: ${bookingData.dropoffDetails.address}
-
-      Service Details:
-      - Service Type: ${getServiceName(bookingData.service)}
-      - Passengers: ${bookingData.passengerDetails.passengers}
-      - Luggage: ${bookingData.passengerDetails.luggage}
-      ${
-        bookingData.passengerDetails.specialRequirements
-          ? `- Special Requirements: ${bookingData.passengerDetails.specialRequirements}`
-          : ''
-      }
-      
-      Extras:
-      ${extras}
-
-      Payment Details:
-      - Total Amount: $${bookingData.amount.toFixed(2)}
-    `;
-
-    // Send email to customer
-    await sendEmail(to, `Booking Confirmation - #${bookingData.bookingNumber}`, customerText, customerHtml, attachments);
-
-    // Send email to business owner
     await sendEmail(
       config.email.from,
-      `New Booking Alert - #${bookingData.bookingNumber}`,
+      `New Booking Alert - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
       ownerText,
       ownerHtml,
       attachments
@@ -305,6 +747,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       to,
       bookingNumber: bookingData?.bookingNumber,
     });
+    throw error;
   }
 };
 

@@ -7,7 +7,9 @@ const createBooking = {
       .keys({
         address: Joi.string().required(),
         date: Joi.date().required(),
-        time: Joi.string().required(),
+        time: Joi.string()
+          .pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+          .required(),
         flightNumber: Joi.string().allow('', null),
         coordinates: Joi.object()
           .keys({
@@ -60,7 +62,7 @@ const createBooking = {
       .keys({
         method: Joi.string().valid('credit_card', 'paypal').required(),
         status: Joi.string().valid('pending', 'completed', 'failed').default('pending'),
-        amount: Joi.number(),
+        amount: Joi.number().required(),
         currency: Joi.string().default('USD'),
         stripePaymentIntentId: Joi.string().allow('', null),
       })
@@ -85,7 +87,6 @@ const createBooking = {
   }),
 };
 
-// Rest of the validation schemas remain the same but remove any vehicle references
 const updateBooking = {
   params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId),
@@ -95,7 +96,7 @@ const updateBooking = {
       pickup: Joi.object().keys({
         address: Joi.string(),
         date: Joi.date(),
-        time: Joi.string(),
+        time: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
         flightNumber: Joi.string().allow('', null),
         coordinates: Joi.object().keys({
           lat: Joi.number(),
@@ -127,12 +128,14 @@ const updateBooking = {
     .min(1),
 };
 
-// Other schemas remain the same
 const getBookings = {
   query: Joi.object().keys({
     sortBy: Joi.string(),
     limit: Joi.number().integer(),
     page: Joi.number().integer(),
+    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+    startDate: Joi.date(),
+    endDate: Joi.date().min(Joi.ref('startDate')),
   }),
 };
 

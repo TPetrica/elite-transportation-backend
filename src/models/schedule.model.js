@@ -44,58 +44,19 @@ const scheduleSchema = mongoose.Schema(
 scheduleSchema.plugin(toJSON);
 
 /**
- * Initialize default schedule based on requirements
+ * Initialize default schedule for 24/7 availability
  */
 scheduleSchema.statics.initializeDefaultSchedule = async function () {
-  const defaultSchedule = [
-    // Sunday (0)
-    {
-      dayOfWeek: 0,
+  const defaultSchedule = [];
+
+  // Create 24/7 availability for all days
+  for (let i = 0; i < 7; i++) {
+    defaultSchedule.push({
+      dayOfWeek: i,
       timeRanges: [{ start: '00:00', end: '23:59' }],
-    },
-    // Monday to Wednesday (1-3)
-    {
-      dayOfWeek: 1,
-      timeRanges: [
-        { start: '00:00', end: '12:00' },
-        { start: '20:00', end: '23:59' },
-      ],
-    },
-    {
-      dayOfWeek: 2,
-      timeRanges: [
-        { start: '00:00', end: '12:00' },
-        { start: '20:00', end: '23:59' },
-      ],
-    },
-    {
-      dayOfWeek: 3,
-      timeRanges: [
-        { start: '00:00', end: '12:00' },
-        { start: '20:00', end: '23:59' },
-      ],
-    },
-    // Thursday and Friday (4-5)
-    {
-      dayOfWeek: 4,
-      timeRanges: [
-        { start: '00:00', end: '07:00' },
-        { start: '17:00', end: '23:59' },
-      ],
-    },
-    {
-      dayOfWeek: 5,
-      timeRanges: [
-        { start: '00:00', end: '07:00' },
-        { start: '17:00', end: '23:59' },
-      ],
-    },
-    // Saturday (6)
-    {
-      dayOfWeek: 6,
-      timeRanges: [{ start: '00:00', end: '23:59' }],
-    },
-  ];
+      isEnabled: true,
+    });
+  }
 
   await this.deleteMany({}); // Clear existing schedule
   await this.insertMany(defaultSchedule);
