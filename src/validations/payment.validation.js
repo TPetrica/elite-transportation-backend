@@ -26,7 +26,7 @@ const createCheckoutSession = {
         flightNumber: Joi.string().allow(''),
         flightTime: Joi.string().allow('', null),
         isCustom: Joi.boolean().optional(),
-      }).unknown(false), // This ensures no extra fields like isCottonwood
+      }).unknown(false),
       dropoff: Joi.object({
         address: Joi.string().required(),
         coordinates: Joi.object({
@@ -34,7 +34,7 @@ const createCheckoutSession = {
           lng: Joi.number().required(),
         }),
         isCustom: Joi.boolean().optional(),
-      }).unknown(false), // This ensures no extra fields like isCottonwood
+      }).unknown(false),
       distance: Joi.object({
         km: Joi.number().required(),
         miles: Joi.number().required(),
@@ -52,6 +52,8 @@ const createCheckoutSession = {
         specialRequirements: Joi.string().allow(''),
       }),
       email: Joi.string().email().required(),
+      affiliate: Joi.boolean().optional(),
+      affiliateCode: Joi.string().optional(),
     }),
   }),
 };

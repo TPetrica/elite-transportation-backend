@@ -181,6 +181,8 @@ const bookingSchema = mongoose.Schema(
         type: String,
       },
     },
+    affiliate: { type: Boolean, default: false },
+    affiliateCode: { type: String, default: '' },
   },
   {
     timestamps: true,

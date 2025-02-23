@@ -84,6 +84,8 @@ const createBooking = {
       eventId: Joi.string().allow('', null),
       link: Joi.string().allow('', null),
     }),
+    affiliate: Joi.boolean().optional(),
+    affiliateCode: Joi.string().optional(),
   }),
 };
 

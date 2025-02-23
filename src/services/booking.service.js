@@ -1,15 +1,12 @@
 const httpStatus = require('http-status');
 const moment = require('moment');
-const mongoose = require('mongoose');
 const Booking = require('../models/booking.model');
-const Vehicle = require('../models/vehicle.model');
 const Extra = require('../models/extra.model');
 const User = require('../models/user.model');
 const availabilityService = require('./availability.service');
 const emailService = require('./email.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
-const { calculateTripPrice } = require('../utils/priceCalculator');
 
 /**
  * Create a booking
@@ -60,15 +57,16 @@ const createBooking = async (bookingBody) => {
     // Generate booking number
     const bookingNumber = await Booking.generateBookingNumber();
 
-    // Create the booking
+    // Create the booking and store affiliate data if provided
     const booking = await Booking.create({
       ...bookingBody,
       bookingNumber,
+      affiliate: bookingBody.affiliate || false,
+      affiliateCode: bookingBody.affiliateCode || '',
     });
 
     logger.info(`Booking created with ID: ${booking._id}`);
 
-    // Send confirmation email
     try {
       // Prepare complete email data
       const emailData = {
@@ -133,10 +131,11 @@ const createBooking = async (bookingBody) => {
 
         // Optional extras
         extras: booking.extras || [],
+        affiliate: booking.affiliate,
       };
 
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
-      logger.info('Booking confirmation email sent successfully');
+      logger.info('Booking confirmation email sent to customer');
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);
       throw new Error('Failed to send confirmation email: ' + error.message);
