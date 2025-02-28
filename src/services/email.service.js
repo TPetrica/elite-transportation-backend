@@ -423,117 +423,6 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       </html>
     `;
 
-    // const ownerHtml = `
-    //   <!DOCTYPE html>
-    //   <html>
-    //   <head>
-    //     <style>${styles}</style>
-    //   </head>
-    //   <body>
-    //     <div class="container">
-    //       <div class="main-content">
-    //         <div class="header">
-    //           <img src="cid:companyLogo" alt="Elite Transportation">
-    //           <h2>New Booking Alert</h2>
-    //         </div>
-    //         <div class="booking-header">
-    //           <h3 class="booking-number">
-    //             Booking Confirmation ${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')} - ${getServiceName(
-    //   bookingData.service
-    // )}
-    //           </h3>
-    //         </div>
-    //         <div class="content-section">
-    //           <h3 class="trip-header">
-    //             Trip Information - ${pickupDate}
-    //           </h3>
-    //           <div class="trip-content">
-    //             <div class="trip-details">
-    //               <div class="time">${pickupTime}</div>
-    //               <div class="address-section">
-    //                 <div class="address-label">Pickup Location</div>
-    //                 <div class="address">${bookingData.pickup.address}</div>
-    //               </div>
-    //               <div class="address-section">
-    //                 <div class="address-label">Drop-off Location</div>
-    //                 <div class="address">${bookingData.dropoff.address}</div>
-    //               </div>
-    //               <div class="trip-metadata">
-    //                 <div class="metadata-row">
-    //                   <span class="metadata-label">Distance</span>
-    //                   <span class="metadata-value">${bookingData.distance.miles} miles (${bookingData.distance.km} km)</span>
-    //                 </div>
-    //                 <div class="metadata-row">
-    //                   <span class="metadata-label">Duration</span>
-    //                   <span class="metadata-value">${bookingData.duration}</span>
-    //                 </div>
-    //                 ${
-    //                   bookingData.pickup.flightNumber
-    //                     ? `
-    //                   <div class="metadata-row">
-    //                     <span class="metadata-label">Flight Number</span>
-    //                     <span class="metadata-value">${bookingData.pickup.flightNumber}</span>
-    //                   </div>
-    //                 `
-    //                     : ''
-    //                 }
-    //               </div>
-    //             </div>
-    //             <div class="passenger-info">
-    //               <div class="info-row">
-    //                 <div class="info-label">Passenger Name</div>
-    //                 <div class="info-value">${bookingData.passengerDetails.firstName} ${
-    //   bookingData.passengerDetails.lastName
-    // }</div>
-    //               </div>
-    //               <div class="info-row">
-    //                 <div class="info-label">Phone</div>
-    //                 <div class="info-value">${bookingData.passengerDetails.phone}</div>
-    //               </div>
-    //               <div class="info-row">
-    //                 <div class="info-label">Email</div>
-    //                 <div class="info-value">${to}</div>
-    //               </div>
-    //               <div class="info-row">
-    //                 <div class="info-label">Passengers</div>
-    //                 <div class="info-value">${bookingData.passengerDetails.passengers}</div>
-    //               </div>
-    //               <div class="info-row">
-    //                 <div class="info-label">Luggage</div>
-    //                 <div class="info-value">${bookingData.passengerDetails.luggage}</div>
-    //               </div>
-    //               ${
-    //                 bookingData.passengerDetails.specialRequirements
-    //                   ? `
-    //                 <div class="info-row">
-    //                   <div class="info-label">Special Requirements</div>
-    //                   <div class="info-value">${bookingData.passengerDetails.specialRequirements}</div>
-    //                 </div>
-    //               `
-    //                   : ''
-    //               }
-    //               <div class="info-row">
-    //                 <div class="info-label">Billing Address</div>
-    //                 <div class="info-value">
-    //                   ${bookingData.billingDetails.address}<br>
-    //                   ${bookingData.billingDetails.city}, ${bookingData.billingDetails.country}<br>
-    //                   ${bookingData.billingDetails.zipCode}
-    //                 </div>
-    //               </div>
-    //             </div>
-    //           </div>
-    //         </div>
-    //         <div class="footer">
-    //           <strong>ELITE TRANSPORTATION</strong><br>
-    //           elitetransportationpc@gmail.com<br>
-    //           (435) 901-9158
-    //         </div>
-    //       </div>
-    //     </div>
-    //   </body>
-    //   </html>
-    // `;
-
     const attachments = [
       {
         filename: 'logo.jpeg',
@@ -551,7 +440,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
     );
 
     await sendEmail(
-      'parkcityhostel@gmail.com',
+      'petru.tirla@gmail.com',
       `Booking Confirmation - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
       customerText,
       customerHtml,

@@ -40,7 +40,9 @@ const createCheckoutSession = {
         miles: Joi.number().required(),
       }),
       duration: Joi.string().required(),
-      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group').required(),
+      service: Joi.string()
+        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
+        .required(),
       passengerDetails: Joi.object({
         firstName: Joi.string().required(),
         lastName: Joi.string().required(),
@@ -53,7 +55,7 @@ const createCheckoutSession = {
       }),
       email: Joi.string().email().required(),
       affiliate: Joi.boolean().optional(),
-      affiliateCode: Joi.string().optional(),
+      affiliateCode: Joi.string().allow('').optional(), // Allow empty string
     }),
   }),
 };

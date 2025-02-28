@@ -156,14 +156,21 @@ const createBooking = async (bookingBody) => {
  */
 const queryBookings = async (filter, options) => {
   try {
-    const bookings = await Booking.paginate(filter, {
-      ...options,
-      populate: [
+    // Create a new options object without modifying the original
+    const paginateOptions = { ...options };
+
+    // Get the paginated results first
+    const bookings = await Booking.paginate(filter, paginateOptions);
+
+    // Manually populate the needed fields
+    if (bookings.results && bookings.results.length > 0) {
+      await Booking.populate(bookings.results, [
         { path: 'vehicle', select: 'name type capacity' },
         { path: 'extras.item', select: 'name price' },
         { path: 'user', select: 'name email phone' },
-      ],
-    });
+      ]);
+    }
+
     return bookings;
   } catch (error) {
     logger.error('Error querying bookings:', error);

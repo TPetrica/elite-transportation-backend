@@ -39,7 +39,9 @@ const createBooking = {
       })
       .required(),
     duration: Joi.string().required(),
-    service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group').required(),
+    service: Joi.string()
+      .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
+      .required(),
     extras: Joi.array().items(
       Joi.object().keys({
         item: Joi.string().custom(objectId).required(),
@@ -85,7 +87,7 @@ const createBooking = {
       link: Joi.string().allow('', null),
     }),
     affiliate: Joi.boolean().optional(),
-    affiliateCode: Joi.string().optional(),
+    affiliateCode: Joi.string().allow('').optional(),
   }),
 };
 
@@ -113,7 +115,7 @@ const updateBooking = {
         }),
       }),
       status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
-      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group'),
+      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons'),
       passengerDetails: Joi.object().keys({
         firstName: Joi.string(),
         lastName: Joi.string(),
@@ -126,6 +128,13 @@ const updateBooking = {
         status: Joi.string().valid('pending', 'completed', 'failed'),
         stripePaymentIntentId: Joi.string().allow('', null),
       }),
+      extras: Joi.array().items(
+        Joi.object().keys({
+          item: Joi.string().custom(objectId).required(),
+          quantity: Joi.number().integer().min(1).required(),
+          price: Joi.number(),
+        })
+      ),
     })
     .min(1),
 };
