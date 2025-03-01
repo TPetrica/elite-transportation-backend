@@ -68,9 +68,6 @@ const sendEmail = async (to, subject, text, html, attachments = []) => {
  * @returns {Promise}
  */
 const sendBookingConfirmationEmail = async (to, bookingData) => {
-  console.log('to', to);
-  console.log('bookingData', bookingData);
-
   try {
     logger.debug('Sending booking confirmation with data:', bookingData);
 
@@ -440,7 +437,7 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
     );
 
     await sendEmail(
-      'petru.tirla@gmail.com',
+      'parkcityhostel@gmail.com',
       `Booking Confirmation - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
       customerText,
       customerHtml,
@@ -467,6 +464,90 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       to,
       bookingNumber: bookingData?.bookingNumber,
     });
+    throw error;
+  }
+};
+
+/**
+ * Send booking update email
+ * @param {string} to
+ * @param {string} bookingNumber
+ * @param {object} passengerDetails
+ * @param {object} updatedFields - Contains fields that were updated
+ * @returns {Promise}
+ */
+const sendBookingUpdateEmail = async (to, bookingNumber, passengerDetails, updatedFields = {}) => {
+  try {
+    logger.debug('Sending booking update email with data:', { bookingNumber, updatedFields });
+
+    const subject = `Booking Update - #${bookingNumber}`;
+
+    // Determine what was updated
+    let updateDescription = '';
+    if (updatedFields.pickup?.date || updatedFields.pickup?.time) {
+      updateDescription = 'Your booking date/time has been updated.';
+    } else if (Object.keys(updatedFields).length > 0) {
+      updateDescription = 'Your booking has been updated.';
+    } else {
+      updateDescription = 'Your booking has been modified.';
+    }
+
+    // Format the pickup date and time if provided
+    let dateTimeInfo = '';
+    if (updatedFields.pickup?.date) {
+      const formattedDate = moment(updatedFields.pickup.date).format('MMMM Do YYYY');
+      dateTimeInfo += `<p><strong>New Date:</strong> ${formattedDate}</p>`;
+    }
+
+    if (updatedFields.pickup?.time) {
+      const formattedTime = moment(updatedFields.pickup.time, 'HH:mm').format('h:mm A');
+      dateTimeInfo += `<p><strong>New Time:</strong> ${formattedTime}</p>`;
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #4CAF50;">Booking Update Notification</h2>
+        <p>Dear ${passengerDetails.firstName || 'Customer'},</p>
+        
+        <p>${updateDescription}</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #4CAF50;">Booking Details</h3>
+          <p><strong>Booking Number:</strong> #${bookingNumber}</p>
+          ${dateTimeInfo}
+        </div>
+
+        <p>If you did not request these changes or have any questions, please contact our support team immediately.</p>
+        
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        
+        <p style="color: #666; font-size: 12px;">
+          Thank you for choosing our service.
+        </p>
+      </div>
+    `;
+
+    const text = `
+      Booking Update Notification - #${bookingNumber}
+
+      Dear ${passengerDetails.firstName || 'Customer'},
+
+      ${updateDescription}
+
+      Booking Details:
+      - Booking Number: #${bookingNumber}
+      ${updatedFields.pickup?.date ? `- New Date: ${moment(updatedFields.pickup.date).format('MMMM Do YYYY')}` : ''}
+      ${updatedFields.pickup?.time ? `- New Time: ${moment(updatedFields.pickup.time, 'HH:mm').format('h:mm A')}` : ''}
+
+      If you did not request these changes or have any questions, please contact our support team immediately.
+
+      Thank you for choosing our service.
+    `;
+
+    await sendEmail(to, subject, text, html);
+    logger.info(`Booking update email sent to ${to}`);
+  } catch (error) {
+    logger.error('Error sending booking update email:', error);
     throw error;
   }
 };
@@ -1014,6 +1095,7 @@ module.exports = {
   sendVerificationEmail,
   sendPaymentInvoice,
   sendDriverAssignmentEmail,
+  sendBookingUpdateEmail,
   // Export transport for testing purposes
   transport,
 };

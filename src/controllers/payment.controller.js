@@ -10,20 +10,9 @@ const { Payment } = require('../models');
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
 
-  logger.info('Creating checkout session', {
-    email: bookingData.email,
-    amount,
-    service: bookingData.service,
-  });
-
+  console.log('req.body', req.body);
+  console.log('billingDetails', billingDetails);
   try {
-    // Ensure the service is one of the valid services for booking creation
-    // This mapping allows frontend to use 'per-person' but transforms it to 'group' for storage
-    const serviceMapping = {
-      'per-person': 'group',
-      // Add other mappings if needed
-    };
-
     // Create Stripe Customer first
     const customer = await stripe.customers.create({
       email: bookingData.email,
@@ -42,10 +31,9 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       email: customer.email,
     });
 
-    // Map the incoming service field if necessary
+    // Map the incoming vehicle field to service
     const modifiedBookingData = {
       ...bookingData,
-      service: serviceMapping[bookingData.service] || bookingData.service,
     };
 
     // Create temporary payment record to store booking data

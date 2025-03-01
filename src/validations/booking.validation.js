@@ -1,22 +1,27 @@
 const Joi = require('joi');
 const { objectId } = require('./custom.validation');
 
+/**
+ * Validation schema for creating a booking
+ */
 const createBooking = {
   body: Joi.object().keys({
+    user: Joi.string().custom(objectId).optional(),
+    email: Joi.string().required().email(),
+    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed').default('pending'),
     pickup: Joi.object()
       .keys({
         address: Joi.string().required(),
         date: Joi.date().required(),
-        time: Joi.string()
-          .pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-          .required(),
-        flightNumber: Joi.string().allow('', null),
+        time: Joi.string().required(),
+        flightNumber: Joi.string().allow('').optional(),
+        flightTime: Joi.string().allow('').optional(),
         coordinates: Joi.object()
           .keys({
-            lat: Joi.number().required(),
-            lng: Joi.number().required(),
+            lat: Joi.number().optional(),
+            lng: Joi.number().optional(),
           })
-          .required(),
+          .optional(),
         isCustom: Joi.boolean().optional(),
       })
       .required(),
@@ -25,10 +30,10 @@ const createBooking = {
         address: Joi.string().required(),
         coordinates: Joi.object()
           .keys({
-            lat: Joi.number().required(),
-            lng: Joi.number().required(),
+            lat: Joi.number().optional(),
+            lng: Joi.number().optional(),
           })
-          .required(),
+          .optional(),
         isCustom: Joi.boolean().optional(),
       })
       .required(),
@@ -42,14 +47,6 @@ const createBooking = {
     service: Joi.string()
       .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
       .required(),
-    extras: Joi.array().items(
-      Joi.object().keys({
-        item: Joi.string().custom(objectId).required(),
-        quantity: Joi.number().integer().min(1).required(),
-        price: Joi.number().required(),
-      })
-    ),
-    email: Joi.string().email().required(),
     passengerDetails: Joi.object()
       .keys({
         firstName: Joi.string().required(),
@@ -57,51 +54,60 @@ const createBooking = {
         phone: Joi.string().required(),
         passengers: Joi.number().integer().min(1).required(),
         luggage: Joi.number().integer().min(0).required(),
-        specialRequirements: Joi.string().allow('', null),
+        specialRequirements: Joi.string().allow('').optional(),
+        notes: Joi.string().allow('').optional(),
       })
       .required(),
+    extras: Joi.array()
+      .items(
+        Joi.object().keys({
+          item: Joi.string().custom(objectId).required(),
+          quantity: Joi.number().integer().min(1).default(1),
+          price: Joi.number().optional(), // Will be calculated on server
+        })
+      )
+      .optional(),
     payment: Joi.object()
       .keys({
         method: Joi.string().valid('credit_card', 'paypal').required(),
         status: Joi.string().valid('pending', 'completed', 'failed').default('pending'),
         amount: Joi.number().required(),
         currency: Joi.string().default('USD'),
-        stripePaymentIntentId: Joi.string().allow('', null),
+        stripePaymentIntentId: Joi.string().allow('').optional(),
       })
       .required(),
     billingDetails: Joi.object()
       .keys({
         firstName: Joi.string().required(),
         lastName: Joi.string().required(),
-        company: Joi.string().allow('', null),
+        company: Joi.string().allow('').optional(),
         address: Joi.string().required(),
         country: Joi.string().required(),
         city: Joi.string().required(),
         zipCode: Joi.string().required(),
       })
       .required(),
-    user: Joi.string().custom(objectId).allow(null),
-    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed').default('pending'),
-    calendar: Joi.object().keys({
-      eventId: Joi.string().allow('', null),
-      link: Joi.string().allow('', null),
-    }),
-    affiliate: Joi.boolean().optional(),
+    affiliate: Joi.boolean().default(false),
     affiliateCode: Joi.string().allow('').optional(),
   }),
 };
 
+/**
+ * Validation schema for updating a booking
+ */
 const updateBooking = {
   params: Joi.object().keys({
-    bookingId: Joi.string().custom(objectId),
+    bookingId: Joi.string().custom(objectId).required(),
   }),
   body: Joi.object()
     .keys({
+      status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
       pickup: Joi.object().keys({
         address: Joi.string(),
         date: Joi.date(),
-        time: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-        flightNumber: Joi.string().allow('', null),
+        time: Joi.string(),
+        flightNumber: Joi.string().allow(''),
+        flightTime: Joi.string().allow(''),
         coordinates: Joi.object().keys({
           lat: Joi.number(),
           lng: Joi.number(),
@@ -114,72 +120,115 @@ const updateBooking = {
           lng: Joi.number(),
         }),
       }),
-      status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
-      service: Joi.string().valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons'),
+      distance: Joi.object().keys({
+        km: Joi.number(),
+        miles: Joi.number(),
+      }),
+      duration: Joi.string(),
       passengerDetails: Joi.object().keys({
         firstName: Joi.string(),
         lastName: Joi.string(),
         phone: Joi.string(),
         passengers: Joi.number().integer().min(1),
         luggage: Joi.number().integer().min(0),
-        specialRequirements: Joi.string().allow('', null),
-      }),
-      payment: Joi.object().keys({
-        status: Joi.string().valid('pending', 'completed', 'failed'),
-        stripePaymentIntentId: Joi.string().allow('', null),
+        specialRequirements: Joi.string().allow(''),
+        notes: Joi.string().allow(''),
       }),
       extras: Joi.array().items(
         Joi.object().keys({
           item: Joi.string().custom(objectId).required(),
-          quantity: Joi.number().integer().min(1).required(),
+          quantity: Joi.number().integer().min(1).default(1),
           price: Joi.number(),
         })
       ),
+      payment: Joi.object().keys({
+        method: Joi.string().valid('credit_card', 'paypal'),
+        status: Joi.string().valid('pending', 'completed', 'failed'),
+        amount: Joi.number(),
+        stripePaymentIntentId: Joi.string().allow(''),
+      }),
+      user: Joi.string().custom(objectId),
     })
     .min(1),
 };
 
-const getBookings = {
-  query: Joi.object().keys({
-    sortBy: Joi.string(),
-    limit: Joi.number().integer(),
-    page: Joi.number().integer(),
-    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
-    startDate: Joi.date(),
-    endDate: Joi.date().min(Joi.ref('startDate')),
-  }),
-};
-
+/**
+ * Validation schema for getting a booking by ID
+ */
 const getBooking = {
   params: Joi.object().keys({
-    bookingId: Joi.string().custom(objectId),
+    bookingId: Joi.string().custom(objectId).required(),
   }),
 };
 
+/**
+ * Validation schema for getting a booking by booking number
+ */
 const getBookingByNumber = {
   params: Joi.object().keys({
     bookingNumber: Joi.string().required(),
   }),
 };
 
+/**
+ * Validation schema for cancelling a booking
+ */
 const cancelBooking = {
   params: Joi.object().keys({
-    bookingId: Joi.string().custom(objectId),
+    bookingId: Joi.string().custom(objectId).required(),
   }),
 };
 
+/**
+ * Validation schema for attaching a user to a booking
+ */
 const attachUserToBooking = {
   params: Joi.object().keys({
     bookingNumber: Joi.string().required(),
   }),
 };
 
-const getUserBookings = {
+/**
+ * Validation schema for querying bookings
+ */
+const getBookings = {
   query: Joi.object().keys({
+    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+    user: Joi.string().custom(objectId),
+    email: Joi.string().email(),
     sortBy: Joi.string(),
     limit: Joi.number().integer(),
     page: Joi.number().integer(),
+    date: Joi.date(),
+    startDate: Joi.date(),
+    endDate: Joi.date(),
+    customerName: Joi.string(),
+    phone: Joi.string(),
+    bookingNumber: Joi.string(),
+    affiliate: Joi.boolean(),
+  }),
+};
+
+/**
+ * Validation schema for getting user's bookings
+ */
+const getUserBookings = {
+  query: Joi.object().keys({
     status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+    sortBy: Joi.string(),
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
+    date: Joi.date(),
+    startDate: Joi.date(),
+    endDate: Joi.date(),
+  }),
+};
+
+/**
+ * Validation schema for getting booking statistics
+ */
+const getBookingStats = {
+  query: Joi.object().keys({
     startDate: Joi.date(),
     endDate: Joi.date().min(Joi.ref('startDate')),
   }),
@@ -187,11 +236,12 @@ const getUserBookings = {
 
 module.exports = {
   createBooking,
-  getBookings,
   getBooking,
-  getBookingByNumber,
+  getBookings,
   updateBooking,
   cancelBooking,
+  getBookingByNumber,
   attachUserToBooking,
   getUserBookings,
+  getBookingStats,
 };

@@ -8,18 +8,12 @@ const emailService = require('./email.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
-/**
- * Create a booking
- * @param {Object} bookingBody
- * @returns {Promise<Booking>}
- */
 const createBooking = async (bookingBody) => {
   console.log('bookingBody', bookingBody);
 
   try {
     logger.info('Starting booking creation process');
 
-    // Validate extras if any
     if (bookingBody.extras?.length) {
       const extraIds = bookingBody.extras.map((extra) => extra.item);
       const extras = await Extra.find({ _id: { $in: extraIds } });
@@ -36,7 +30,6 @@ const createBooking = async (bookingBody) => {
       });
     }
 
-    // Validate user if provided
     if (bookingBody.user) {
       const user = await User.findById(bookingBody.user);
       if (!user) {
@@ -44,7 +37,6 @@ const createBooking = async (bookingBody) => {
       }
     }
 
-    // Check time slot availability
     const isAvailable = await availabilityService.checkTimeSlotAvailability(
       bookingBody.pickup.date,
       bookingBody.pickup.time
@@ -54,10 +46,8 @@ const createBooking = async (bookingBody) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Selected time slot is no longer available');
     }
 
-    // Generate booking number
     const bookingNumber = await Booking.generateBookingNumber();
 
-    // Create the booking and store affiliate data if provided
     const booking = await Booking.create({
       ...bookingBody,
       bookingNumber,
@@ -68,13 +58,9 @@ const createBooking = async (bookingBody) => {
     logger.info(`Booking created with ID: ${booking._id}`);
 
     try {
-      // Prepare complete email data
       const emailData = {
-        // Basic booking info
         bookingNumber: booking.bookingNumber,
         amount: booking.payment.amount,
-
-        // Trip details
         pickup: {
           date: booking.pickup.date,
           time: booking.pickup.time,
@@ -89,15 +75,9 @@ const createBooking = async (bookingBody) => {
           coordinates: booking.dropoff.coordinates,
           isCustom: booking.dropoff.isCustom || false,
         },
-
-        // Trip metrics
         distance: booking.distance,
         duration: booking.duration,
-
-        // Service info
         service: booking.service,
-
-        // Passenger details
         passengerDetails: {
           firstName: booking.passengerDetails.firstName,
           lastName: booking.passengerDetails.lastName,
@@ -108,8 +88,6 @@ const createBooking = async (bookingBody) => {
           notes: booking.passengerDetails.notes || '',
           specialRequirements: booking.passengerDetails.specialRequirements || '',
         },
-
-        // Billing details
         billingDetails: {
           firstName: booking.billingDetails.firstName,
           lastName: booking.billingDetails.lastName,
@@ -120,16 +98,12 @@ const createBooking = async (bookingBody) => {
           zipCode: booking.billingDetails.zipCode,
           email: booking.billingDetails.email || '',
         },
-
-        // Payment details
         payment: {
           method: booking.payment.method,
           amount: booking.payment.amount,
           status: booking.payment.status,
           currency: 'USD',
         },
-
-        // Optional extras
         extras: booking.extras || [],
         affiliate: booking.affiliate,
       };
@@ -148,19 +122,91 @@ const createBooking = async (bookingBody) => {
   }
 };
 
-/**
- * Query for bookings
- * @param {Object} filter - Mongo filter
- * @param {Object} options - Query options
- * @returns {Promise<QueryResult>}
- */
+const processQueryFilters = (filter) => {
+  const queryFilter = { ...filter };
+
+  // Process date filter
+  if (queryFilter.date) {
+    const date = new Date(queryFilter.date);
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    queryFilter['pickup.date'] = {
+      $gte: startOfDay,
+      $lte: endOfDay,
+    };
+
+    delete queryFilter.date;
+  }
+
+  // Process date range filters
+  if (queryFilter.startDate) {
+    const startDate = new Date(queryFilter.startDate);
+    if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
+    queryFilter['pickup.date'].$gte = startDate;
+    delete queryFilter.startDate;
+  }
+
+  if (queryFilter.endDate) {
+    const endDate = new Date(queryFilter.endDate);
+    if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
+    queryFilter['pickup.date'].$lte = endDate;
+    delete queryFilter.endDate;
+  }
+
+  // Process passenger name search
+  if (queryFilter.customerName) {
+    const nameRegex = new RegExp(queryFilter.customerName, 'i');
+    queryFilter.$or = [{ 'passengerDetails.firstName': nameRegex }, { 'passengerDetails.lastName': nameRegex }];
+    delete queryFilter.customerName;
+  }
+
+  // Process phone search
+  if (queryFilter.phone) {
+    queryFilter['passengerDetails.phone'] = new RegExp(queryFilter.phone, 'i');
+    delete queryFilter.phone;
+  }
+
+  // Process email search
+  if (queryFilter.email) {
+    queryFilter.email = new RegExp(queryFilter.email, 'i');
+  }
+
+  // Process boolean fields
+  if (queryFilter.affiliate !== undefined) {
+    queryFilter.affiliate = queryFilter.affiliate === 'true';
+  }
+
+  // Remove pagination parameters from the filter
+  delete queryFilter.sortBy;
+  delete queryFilter.limit;
+  delete queryFilter.page;
+
+  return queryFilter;
+};
+
 const queryBookings = async (filter, options) => {
   try {
+    logger.info(`Raw filter: ${JSON.stringify(filter)}`);
+
+    // Process the filter to handle special cases like date ranges
+    const processedFilter = processQueryFilters(filter);
+
+    logger.info(`Processed filter: ${JSON.stringify(processedFilter)}`);
+
     // Create a new options object without modifying the original
     const paginateOptions = { ...options };
 
+    // Set default sort by date if not specified
+    if (!paginateOptions.sortBy) {
+      paginateOptions.sortBy = 'pickup.date:desc';
+    }
+
     // Get the paginated results first
-    const bookings = await Booking.paginate(filter, paginateOptions);
+    const bookings = await Booking.paginate(processedFilter, paginateOptions);
 
     // Manually populate the needed fields
     if (bookings.results && bookings.results.length > 0) {
@@ -178,11 +224,6 @@ const queryBookings = async (filter, options) => {
   }
 };
 
-/**
- * Get booking by id
- * @param {ObjectId} id
- * @returns {Promise<Booking>}
- */
 const getBookingById = async (id) => {
   try {
     const booking = await Booking.findById(id)
@@ -200,11 +241,6 @@ const getBookingById = async (id) => {
   }
 };
 
-/**
- * Get booking by booking number
- * @param {string} bookingNumber
- * @returns {Promise<Booking>}
- */
 const getBookingByNumber = async (bookingNumber) => {
   try {
     const booking = await Booking.findOne({ bookingNumber })
@@ -222,18 +258,24 @@ const getBookingByNumber = async (bookingNumber) => {
   }
 };
 
-/**
- * Update booking by id
- * @param {ObjectId} bookingId
- * @param {Object} updateBody
- * @returns {Promise<Booking>}
- */
 const updateBookingById = async (bookingId, updateBody) => {
   try {
     const booking = await getBookingById(bookingId);
 
     if (booking.status === 'completed') {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update completed booking');
+    }
+
+    // Check if pickup date or time is being updated
+    const isDateTimeChange = updateBody.pickup?.date || updateBody.pickup?.time;
+    const updatedDateTime = {};
+
+    if (updateBody.pickup?.date) {
+      updatedDateTime.date = updateBody.pickup.date;
+    }
+
+    if (updateBody.pickup?.time) {
+      updatedDateTime.time = updateBody.pickup.time;
     }
 
     // If updating extras
@@ -253,25 +295,46 @@ const updateBookingById = async (bookingId, updateBody) => {
       });
     }
 
-    // If updating time/date
-    if (updateBody.pickup?.date || updateBody.pickup?.time) {
+    // If updating time/date, check if the new slot is available
+    // but make an exception for the current booking's time slot
+    if (isDateTimeChange) {
       const newDate = updateBody.pickup?.date || booking.pickup.date;
       const newTime = updateBody.pickup?.time || booking.pickup.time;
 
-      const isAvailable = await availabilityService.checkTimeSlotAvailability(newDate, newTime);
-      if (!isAvailable) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Selected time slot is not available');
+      // Only check availability if the date or time has changed
+      const dateChanged =
+        updateBody.pickup?.date &&
+        moment(updateBody.pickup.date).format('YYYY-MM-DD') !== moment(booking.pickup.date).format('YYYY-MM-DD');
+      const timeChanged = updateBody.pickup?.time && updateBody.pickup.time !== booking.pickup.time;
+
+      if (dateChanged || timeChanged) {
+        // Check availability, excluding this booking from the check
+        const isAvailable = await availabilityService.checkTimeSlotAvailability(
+          newDate,
+          newTime,
+          bookingId // Pass the current booking ID to exclude it from the availability check
+        );
+
+        if (!isAvailable) {
+          throw new ApiError(httpStatus.BAD_REQUEST, 'Selected time slot is not available');
+        }
       }
     }
 
     Object.assign(booking, updateBody);
     await booking.save();
 
-    // Send update email
-    try {
-      await emailService.sendBookingUpdateEmail(booking.email, booking.bookingNumber, booking.passengerDetails);
-    } catch (error) {
-      logger.error('Failed to send update email:', error);
+    // Send update email if date/time was changed
+    if (isDateTimeChange) {
+      try {
+        await emailService.sendBookingUpdateEmail(booking.email, booking.bookingNumber, booking.passengerDetails, {
+          pickup: updatedDateTime,
+        });
+        logger.info(`Booking update email sent to ${booking.email} for booking ${booking.bookingNumber}`);
+      } catch (error) {
+        logger.error('Failed to send update email:', error);
+        // Continue with the booking update even if the email fails
+      }
     }
 
     return booking;
@@ -281,11 +344,6 @@ const updateBookingById = async (bookingId, updateBody) => {
   }
 };
 
-/**
- * Cancel booking by id
- * @param {ObjectId} bookingId
- * @returns {Promise<Booking>}
- */
 const cancelBookingById = async (bookingId) => {
   try {
     const booking = await getBookingById(bookingId);
@@ -318,12 +376,6 @@ const cancelBookingById = async (bookingId) => {
   }
 };
 
-/**
- * Attach user to guest booking
- * @param {string} bookingNumber
- * @param {ObjectId} userId
- * @returns {Promise<Booking>}
- */
 const attachUserToBooking = async (bookingNumber, userId) => {
   try {
     const booking = await getBookingByNumber(bookingNumber);
@@ -347,12 +399,6 @@ const attachUserToBooking = async (bookingNumber, userId) => {
   }
 };
 
-/**
- * Get user bookings
- * @param {ObjectId} userId
- * @param {Object} options - Query options
- * @returns {Promise<QueryResult>}
- */
 const getUserBookings = async (userId, options) => {
   try {
     const user = await User.findById(userId);
@@ -373,13 +419,21 @@ const getUserBookings = async (userId, options) => {
   }
 };
 
-/**
- * Get bookings statistics
- * @returns {Promise<Object>}
- */
-const getBookingStats = async () => {
+const getBookingStats = async (startDate, endDate) => {
   try {
-    const stats = await Booking.aggregate([
+    // Create date filters if provided
+    const dateFilter = {};
+    if (startDate) {
+      dateFilter['pickup.date'] = { $gte: new Date(startDate) };
+    }
+    if (endDate) {
+      if (!dateFilter['pickup.date']) dateFilter['pickup.date'] = {};
+      dateFilter['pickup.date'].$lte = new Date(endDate);
+    }
+
+    // Get status breakdown with optional date filter
+    const statusAggregation = await Booking.aggregate([
+      { $match: dateFilter },
       {
         $group: {
           _id: '$status',
@@ -389,15 +443,40 @@ const getBookingStats = async () => {
       },
     ]);
 
+    // Get upcoming bookings (from today)
     const today = moment().startOf('day');
     const upcomingBookings = await Booking.countDocuments({
       'pickup.date': { $gte: today.toDate() },
       status: { $in: ['pending', 'confirmed'] },
+      ...dateFilter,
     });
 
+    // Get today's bookings
+    const todayBookings = await Booking.countDocuments({
+      'pickup.date': {
+        $gte: today.toDate(),
+        $lte: moment().endOf('day').toDate(),
+      },
+      ...dateFilter,
+    });
+
+    // Get total active vehicles count (this would typically come from the vehicle service,
+    // but we'll mock it here for simplicity)
+    const activeVehicles = 0; // Replace with actual vehicle count when available
+
+    // Calculate total revenue for the period
+    const totalRevenue = statusAggregation.reduce((sum, status) => sum + (status.totalRevenue || 0), 0);
+
+    // Get recent bookings for the dashboard
+    const recentBookings = await Booking.find(dateFilter).sort({ createdAt: -1 }).limit(5).populate('extras.item').lean();
+
     return {
-      statusBreakdown: stats,
+      statusBreakdown: statusAggregation,
       upcomingBookings,
+      todayBookings,
+      activeVehicles,
+      totalRevenue,
+      recentBookings,
     };
   } catch (error) {
     logger.error('Error getting booking stats:', error);

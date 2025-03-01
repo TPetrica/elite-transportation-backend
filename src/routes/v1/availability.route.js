@@ -3,20 +3,22 @@ const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const availabilityValidation = require('../../validations/availability.validation');
 const availabilityController = require('../../controllers/availability.controller');
+const dateExceptionRoutes = require('./date-exception.route');
 
 const router = express.Router();
 
-// Public routes
-router.get('/time-slots', validate(availabilityValidation.getTimeSlots), availabilityController.getAvailableTimeSlots);
-router.get('/check', validate(availabilityValidation.checkAvailability), availabilityController.checkTimeSlotAvailability);
+// Include date exception routes
+router.use('/exceptions', dateExceptionRoutes);
 
-// Protected routes (require authentication)
-router.get('/schedule', auth('manageSchedule'), availabilityController.getFullSchedule);
-router.put(
-  '/schedule',
-  auth('manageSchedule'),
-  validate(availabilityValidation.updateSchedule),
-  availabilityController.updateSchedule
-);
+// Public routes - no authentication required
+router.get('/time-slots', validate(availabilityValidation.getTimeSlots), availabilityController.getAvailableTimeSlots);
+router.post('/check', validate(availabilityValidation.checkAvailability), availabilityController.checkAvailability);
+router.get('/check', validate(availabilityValidation.checkAvailability), availabilityController.checkAvailabilityGet);
+
+// Admin routes - authentication required
+router
+  .route('/schedule')
+  .get(auth('manageSchedule'), availabilityController.getSchedule)
+  .put(auth('manageSchedule'), validate(availabilityValidation.updateSchedule), availabilityController.updateSchedule);
 
 module.exports = router;

@@ -21,6 +21,9 @@ const getExtras = {
     type: Joi.string().valid('quantity', 'selection'),
     isAvailable: Joi.boolean(),
     sort: Joi.string(),
+    // Add pagination parameters
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
   }),
 };
 

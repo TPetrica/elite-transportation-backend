@@ -3,5 +3,7 @@ module.exports.userValidation = require('./user.validation');
 module.exports.bookingValidation = require('./booking.validation');
 module.exports.vehicleValidation = require('./vehicle.validation');
 module.exports.extraValidation = require('./extra.validation');
+module.exports.serviceValidation = require('./service.validation');
+module.exports.dateExceptionValidation = require('./dateException.validation');
 module.exports.paymentValidation = require('./payment.validation');
 module.exports.availabilityValidation = require('./availability.validation');

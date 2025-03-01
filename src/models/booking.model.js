@@ -72,7 +72,7 @@ const bookingSchema = mongoose.Schema(
     },
     service: {
       type: String,
-      enum: ['to-airport', 'from-airport', 'round-trip', 'hourly', 'group'],
+      enum: ['to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons'],
       required: true,
     },
     // Passenger Details

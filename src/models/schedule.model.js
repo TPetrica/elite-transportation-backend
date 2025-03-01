@@ -1,21 +1,16 @@
 const mongoose = require('mongoose');
 const { toJSON } = require('./plugins');
 
-const timeRangeSchema = new mongoose.Schema(
-  {
-    start: {
-      type: String,
-      required: true,
-      match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, // HH:mm format
-    },
-    end: {
-      type: String,
-      required: true,
-      match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, // HH:mm format
-    },
+const timeRangeSchema = mongoose.Schema({
+  start: {
+    type: String,
+    required: true,
   },
-  { _id: false }
-);
+  end: {
+    type: String,
+    required: true,
+  },
+});
 
 const scheduleSchema = mongoose.Schema(
   {
@@ -26,14 +21,45 @@ const scheduleSchema = mongoose.Schema(
       max: 6,
       unique: true,
     },
-    timeRanges: {
-      type: [timeRangeSchema],
-      required: true,
-      default: [],
-    },
     isEnabled: {
       type: Boolean,
       default: true,
+    },
+    timeRanges: {
+      type: [timeRangeSchema],
+      default: [{ start: '09:00', end: '17:00' }],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Special date exception schema for specific dates
+const dateExceptionSchema = mongoose.Schema(
+  {
+    date: {
+      type: Date,
+      required: true,
+      unique: true,
+    },
+    isEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    reason: {
+      type: String,
+      trim: true,
+    },
+    timeRanges: {
+      type: [timeRangeSchema],
+      default: [],
+    },
+    // Type of exception: 'closed' or 'custom-hours'
+    type: {
+      type: String,
+      enum: ['closed', 'custom-hours'],
+      default: 'closed',
     },
   },
   {
@@ -42,26 +68,12 @@ const scheduleSchema = mongoose.Schema(
 );
 
 scheduleSchema.plugin(toJSON);
-
-/**
- * Initialize default schedule for 24/7 availability
- */
-scheduleSchema.statics.initializeDefaultSchedule = async function () {
-  const defaultSchedule = [];
-
-  // Create 24/7 availability for all days
-  for (let i = 0; i < 7; i++) {
-    defaultSchedule.push({
-      dayOfWeek: i,
-      timeRanges: [{ start: '00:00', end: '23:59' }],
-      isEnabled: true,
-    });
-  }
-
-  await this.deleteMany({}); // Clear existing schedule
-  await this.insertMany(defaultSchedule);
-};
+dateExceptionSchema.plugin(toJSON);
 
 const Schedule = mongoose.model('Schedule', scheduleSchema);
+const DateException = mongoose.model('DateException', dateExceptionSchema);
 
-module.exports = Schedule;
+module.exports = {
+  Schedule,
+  DateException,
+};

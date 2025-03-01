@@ -1,34 +1,46 @@
 const mongoose = require('mongoose');
-const { toJSON } = require('./plugins');
+const { toJSON, paginate } = require('./plugins');
 
 const serviceSchema = mongoose.Schema(
   {
-    id: {
+    serviceType: {
       type: String,
       required: true,
       unique: true,
-      enum: ['to-airport', 'from-airport', 'round-trip', 'hourly', 'group'],
+      trim: true,
     },
-    name: {
+    title: {
       type: String,
       required: true,
+      trim: true,
     },
     description: {
       type: String,
       required: true,
     },
+    maxPassengers: {
+      type: Number,
+      default: null,
+    },
     basePrice: {
       type: Number,
       required: true,
     },
-    vehicle: {
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: 'Vehicle',
-      required: true,
+    requiresInquiry: {
+      type: Boolean,
+      default: false,
     },
     isActive: {
       type: Boolean,
       default: true,
+    },
+    sortOrder: {
+      type: Number,
+      default: 0,
+    },
+    vehicle: {
+      type: mongoose.SchemaTypes.ObjectId,
+      ref: 'Vehicle',
     },
   },
   {
@@ -36,9 +48,13 @@ const serviceSchema = mongoose.Schema(
   }
 );
 
-// Add plugins
+// add plugin that converts mongoose to json
 serviceSchema.plugin(toJSON);
+serviceSchema.plugin(paginate);
 
+/**
+ * @typedef Service
+ */
 const Service = mongoose.model('Service', serviceSchema);
 
 module.exports = Service;

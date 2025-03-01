@@ -12,7 +12,16 @@ const getAvailableTimeSlots = catchAsync(async (req, res) => {
   res.send(result);
 });
 
-const checkTimeSlotAvailability = catchAsync(async (req, res) => {
+const checkAvailability = catchAsync(async (req, res) => {
+  const { date, time } = req.body;
+  if (!date || !time) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Date and time are required');
+  }
+  const isAvailable = await availabilityService.checkTimeSlotAvailability(date, time);
+  res.send({ isAvailable });
+});
+
+const checkAvailabilityGet = catchAsync(async (req, res) => {
   const { date, time } = req.query;
   if (!date || !time) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Date and time are required');
@@ -22,19 +31,25 @@ const checkTimeSlotAvailability = catchAsync(async (req, res) => {
 });
 
 const updateSchedule = catchAsync(async (req, res) => {
-  const { dayOfWeek, timeRanges, isEnabled } = req.body;
-  const schedule = await availabilityService.updateSchedule(dayOfWeek, timeRanges, isEnabled);
+  const { dayOfWeek } = req.body;
+  const updateData = {
+    timeRanges: req.body.timeRanges,
+    isEnabled: req.body.isEnabled,
+  };
+
+  const schedule = await availabilityService.updateSchedule(dayOfWeek, updateData);
   res.send(schedule);
 });
 
-const getFullSchedule = catchAsync(async (req, res) => {
-  const schedule = await availabilityService.getFullSchedule();
+const getSchedule = catchAsync(async (req, res) => {
+  const schedule = await availabilityService.getSchedule();
   res.send(schedule);
 });
 
 module.exports = {
   getAvailableTimeSlots,
-  checkTimeSlotAvailability,
+  checkAvailability,
+  checkAvailabilityGet,
   updateSchedule,
-  getFullSchedule,
+  getSchedule,
 };
