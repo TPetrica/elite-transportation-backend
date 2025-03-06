@@ -436,13 +436,17 @@ const sendBookingConfirmationEmail = async (to, bookingData) => {
       attachments
     );
 
-    await sendEmail(
-      'parkcityhostel@gmail.com',
-      `Booking Confirmation - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
-      customerText,
-      customerHtml,
-      attachments
-    );
+    // If this is a PCH affiliate booking, send a copy to the hostel
+    if (bookingData.affiliate === true && bookingData.affiliateCode === 'PCH') {
+      await sendEmail(
+        'parkcityhostel@gmail.com', // Replace with actual hostel email
+        `Booking Confirmation - #${bookingData.bookingNumber || 'BK' + moment().format('YYYYMMDD')}`,
+        customerText,
+        customerHtml,
+        attachments
+      );
+      logger.info('Affiliate booking confirmation email sent to hostel');
+    }
 
     await sendEmail(
       config.email.from,
@@ -1084,6 +1088,125 @@ const sendDriverAssignmentEmail = async (to, bookingData, driverData) => {
   }
 };
 
+/**
+ * Send a special affiliate booking notification
+ * @param {string} to
+ * @param {object} booking
+ * @returns {Promise}
+ */
+const sendAffiliateBookingNotification = async (to, booking) => {
+  try {
+    const getServiceName = (service) => {
+      switch (service) {
+        case 'from-airport':
+          return 'Airport Pickup Service';
+        case 'to-airport':
+          return 'Airport Drop-off Service';
+        case 'canyons':
+          return 'Cottonwood Canyons Transfer';
+        case 'hourly':
+          return 'Hourly Service';
+        case 'per-person':
+          return 'Per Person Service';
+        default:
+          return 'Transportation Service';
+      }
+    };
+
+    const pickupDate = moment(booking.pickup.date).format('MMMM Do YYYY');
+    const pickupTime = moment(booking.pickup.time, 'HH:mm').format('h:mm A');
+
+    const subject = `New Park City Hostel Guest Transfer - #${booking.bookingNumber}`;
+
+    const text = `
+      New Park City Hostel Guest Transfer - Booking #${booking.bookingNumber}
+      
+      A new booking has been placed through the PCH affiliate program:
+      
+      Service: ${getServiceName(booking.service)}
+      Date: ${pickupDate}
+      Time: ${pickupTime}
+      From: ${booking.pickup.address}
+      To: ${booking.dropoff.address}
+      
+      Passenger: ${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}
+      Phone: ${booking.passengerDetails.phone}
+      Passengers: ${booking.passengerDetails.passengers}
+      Luggage: ${booking.passengerDetails.luggage}
+      
+      Amount: $${booking.payment.amount}
+      
+      This booking will be automatically added to our transportation schedule. The driver will contact the guest directly.
+    `;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .main-content { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+          .header { background: #1a1a1a; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; }
+          .booking-info { margin-bottom: 20px; }
+          .booking-info div { margin-bottom: 10px; }
+          .label { font-weight: bold; }
+          .footer { text-align: center; padding: 20px; background: #f8f9fa; border-top: 1px solid #e1e1e1; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="main-content">
+            <div class="header">
+              <h2>New Park City Hostel Guest Transfer</h2>
+            </div>
+            <div class="content">
+              <h3>Booking #${booking.bookingNumber}</h3>
+              <p>A new guest transport booking has been placed:</p>
+              
+              <div class="booking-info">
+                <div><span class="label">Service:</span> ${getServiceName(booking.service)}</div>
+                <div><span class="label">Date:</span> ${pickupDate}</div>
+                <div><span class="label">Time:</span> ${pickupTime}</div>
+                <div><span class="label">From:</span> ${booking.pickup.address}</div>
+                <div><span class="label">To:</span> ${booking.dropoff.address}</div>
+                <div><span class="label">Passenger:</span> ${booking.passengerDetails.firstName} ${
+      booking.passengerDetails.lastName
+    }</div>
+                <div><span class="label">Phone:</span> ${booking.passengerDetails.phone}</div>
+                <div><span class="label">Passengers:</span> ${booking.passengerDetails.passengers}</div>
+                <div><span class="label">Luggage:</span> ${booking.passengerDetails.luggage}</div>
+                <div><span class="label">Amount:</span> $${booking.payment.amount}</div>
+              </div>
+              
+              <p>This booking has been confirmed and will be automatically added to our transportation schedule. The driver will contact the guest directly.</p>
+            </div>
+            <div class="footer">
+              <p>ELITE TRANSPORTATION</p>
+              <p>For questions, please contact: (435) 901-9158</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send to petru.tirla@gmail.com for testing
+    await sendEmail(to, subject, text, html);
+
+    // Also send to the actual hostel email
+    if (booking.affiliateCode === 'PCH') {
+      await sendEmail('reservation@parkcityhostel.com', subject, text, html);
+    }
+
+    logger.info(`Affiliate booking notification sent to ${to}`);
+  } catch (error) {
+    logger.error('Error sending affiliate booking notification:', error);
+    // Don't let this error stop the booking process
+  }
+};
+
 module.exports = {
   sendEmail,
   sendBookingConfirmationEmail,
@@ -1096,6 +1219,7 @@ module.exports = {
   sendPaymentInvoice,
   sendDriverAssignmentEmail,
   sendBookingUpdateEmail,
+  sendAffiliateBookingNotification,
   // Export transport for testing purposes
   transport,
 };

@@ -1,126 +1,120 @@
 /**
- * This script will delete all existing services and seed new ones with proper serviceType field
+ * This script will add users to the MongoDB database
  *
  * Usage:
  * - Place this file in the scripts directory of your project
- * - Run with: node scripts/seedServices.js
+ * - Run with: node scripts/seedUsers.js
  */
 
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const config = require('./src/config/config');
 const logger = require('./src/config/logger');
-const Service = require('./src/models/service.model');
+const User = require('./src/models/user.model');
+const readline = require('readline');
+
+// Create readline interface for user input
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+// Function to prompt for input
+const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 // Connect to MongoDB
 mongoose.connect(config.mongoose.url, config.mongoose.options).then(() => {
   logger.info('Connected to MongoDB');
-  seedServices()
+  addUser()
     .then(() => {
-      logger.info('Service data seeded successfully');
+      logger.info('User added successfully');
       process.exit(0);
     })
     .catch((error) => {
-      logger.error('Error seeding services:', error);
+      logger.error('Error adding user:', error);
       process.exit(1);
     });
 });
 
-// Services to be seeded
-const services = [
-  {
-    serviceType: 'from-airport',
-    title: 'From Airport (1-4 Passengers)',
-    description: 'Airport pickup with flight tracking - $120',
-    maxPassengers: 4,
-    basePrice: 120,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 1,
-  },
-  {
-    serviceType: 'to-airport',
-    title: 'To Airport (1-4 Passengers)',
-    description: 'Airport dropoff service - $120',
-    maxPassengers: 4,
-    basePrice: 120,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 2,
-  },
-  {
-    serviceType: 'canyons',
-    title: 'Cottonwood Canyons Transfer (1-4 Passengers)',
-    description: 'To/From Snowbird/Alta/Solitude/Brighton/Sundance - $150',
-    maxPassengers: 4,
-    basePrice: 150,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 3,
-  },
-  {
-    serviceType: 'hourly',
-    title: 'Hourly Service',
-    description: '$100 per hour',
-    maxPassengers: 4,
-    basePrice: 100,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 4,
-  },
-  {
-    serviceType: 'per-person',
-    title: 'Per Person Service',
-    description: '$65 per person (minimum 2 persons - $130)',
-    maxPassengers: 4,
-    basePrice: 65,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 5,
-  },
-  {
-    serviceType: 'group',
-    title: 'Group Transportation (5+ passengers)',
-    description: 'Group - please inquire for pricing and availability',
-    maxPassengers: null,
-    basePrice: 0,
-    requiresInquiry: true,
-    isActive: true,
-    sortOrder: 6,
-  },
-  {
-    serviceType: 'round-trip',
-    title: 'Round Trip (1-4 Passengers)',
-    description: 'Round trip service with discount - $200',
-    maxPassengers: 4,
-    basePrice: 200,
-    requiresInquiry: false,
-    isActive: true,
-    sortOrder: 7,
-  },
-];
-
-async function seedServices() {
+/**
+ * Add a new user to the database
+ */
+async function addUser() {
   try {
-    // Delete all existing services
-    logger.info('Deleting all existing services...');
-    await Service.deleteMany({});
+    logger.info('=== Add New User ===');
 
-    // Insert new services
-    logger.info('Inserting new services with serviceType field...');
-    await Service.insertMany(services);
+    // Ask if user wants to delete all existing users first
+    const shouldDeleteAll = await question('Do you want to delete all existing users first? (yes/no): ');
+    if (shouldDeleteAll.toLowerCase() === 'yes') {
+      logger.info('Deleting all existing users...');
+      await User.deleteMany({});
+      logger.info('All users deleted.');
+    }
 
-    // Verify services were created correctly
-    const count = await Service.countDocuments();
-    logger.info(`Created ${count} services successfully`);
+    // Collect user data
+    const userData = {
+      name: await question('Enter name: '),
+      email: await question('Enter email: '),
+      password: await question('Enter password: '),
+      phone: await question('Enter phone: '),
+      role: (await question('Enter role (user/admin) [default: user]: ')) || 'user',
+      isEmailVerified: (await question('Is email verified? (yes/no) [default: no]: ')).toLowerCase() === 'yes',
+    };
 
-    // List all service types (for verification)
-    const createdServices = await Service.find().select('serviceType title');
-    logger.info('Created services:');
-    createdServices.forEach((service) => {
-      logger.info(`${service.title} (${service.serviceType})`);
-    });
+    // Validate required fields
+    if (!userData.name || !userData.email || !userData.password || !userData.phone) {
+      throw new Error('All fields (name, email, password, phone) are required.');
+    }
+
+    // Validate password
+    if (userData.password.length < 8 || !userData.password.match(/\d/) || !userData.password.match(/[a-zA-Z]/)) {
+      throw new Error('Password must be at least 8 characters and contain both letters and numbers.');
+    }
+
+    // Check if user with this email already exists
+    const existingUser = await User.findOne({ email: userData.email });
+    if (existingUser) {
+      const overwrite = await question('A user with this email already exists. Overwrite? (yes/no): ');
+      if (overwrite.toLowerCase() === 'yes') {
+        logger.info('Overwriting existing user...');
+        await User.deleteOne({ email: userData.email });
+      } else {
+        throw new Error('User creation aborted. Email already exists.');
+      }
+    }
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(8);
+    const hashedPassword = await bcrypt.hash(userData.password, salt);
+    userData.password = hashedPassword;
+
+    // Create the user
+    const user = await User.create(userData);
+
+    // Output the created user (excluding password)
+    logger.info('User created successfully:');
+    logger.info(`Name: ${user.name}`);
+    logger.info(`Email: ${user.email}`);
+    logger.info(`Phone: ${user.phone}`);
+    logger.info(`Role: ${user.role}`);
+    logger.info(`Email Verified: ${user.isEmailVerified}`);
+    logger.info(`ID: ${user._id}`);
+
+    // Ask if user wants to add another user
+    const addAnother = await question('Do you want to add another user? (yes/no): ');
+    if (addAnother.toLowerCase() === 'yes') {
+      await addUser();
+    } else {
+      rl.close();
+    }
   } catch (error) {
-    logger.error('Error in seedServices:', error);
+    logger.error(`Error adding user: ${error.message}`);
+    rl.close();
     throw error;
   }
 }
+
+// Close readline on exit
+process.on('exit', () => {
+  rl.close();
+});

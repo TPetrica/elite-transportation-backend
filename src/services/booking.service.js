@@ -106,13 +106,16 @@ const createBooking = async (bookingBody) => {
         },
         extras: booking.extras || [],
         affiliate: booking.affiliate,
+        affiliateCode: booking.affiliateCode || '',
       };
 
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
       logger.info('Booking confirmation email sent to customer');
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);
-      throw new Error('Failed to send confirmation email: ' + error.message);
+      // Don't throw an error here, just log it and continue
+      // This way the booking is still created even if there's an email error
+      logger.warn('Continuing with booking creation despite email error');
     }
 
     return booking;
