@@ -12,6 +12,8 @@ const allRoles = {
     'getServices',
     'manageServices',
     'manageSchedule',
+    'getBlogs',
+    'manageBlogs',
   ],
 };
 

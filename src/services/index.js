@@ -11,3 +11,4 @@ module.exports.calendarService = require('./calendar.service');
 module.exports.paymentService = require('./payment.service');
 module.exports.availabilityService = require('./availability.service');
 module.exports.smsService = require('./sms.service');
+module.exports.blogService = require('./blog.service');

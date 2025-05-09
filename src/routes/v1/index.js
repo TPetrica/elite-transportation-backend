@@ -7,6 +7,7 @@ const vehicleRoute = require('./vehicle.route');
 const extraRoute = require('./extra.route');
 const serviceRoute = require('./service.route');
 const availabilityRoute = require('./availability.route');
+const blogRoute = require('./blog.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
 
@@ -44,6 +45,10 @@ const defaultRoutes = [
   {
     path: '/payment',
     route: paymentRoute,
+  },
+  {
+    path: '/blogs',
+    route: blogRoute,
   },
 ];
 

@@ -6,3 +6,4 @@ module.exports.dateExceptionController = require('./date-exception.controller');
 module.exports.extraController = require('./extra.controller');
 module.exports.availabilityController = require('./availability.controller');
 module.exports.bookingController = require('./booking.controller');
+module.exports.blogController = require('./blog.controller');
