@@ -14,6 +14,7 @@ const allRoles = {
     'manageSchedule',
     'getBlogs',
     'manageBlogs',
+    'manageAffiliates',
   ],
 };
 

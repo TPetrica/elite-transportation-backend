@@ -7,6 +7,7 @@ module.exports.Extra = require('./extra.model');
 module.exports.Payment = require('./payment.model');
 module.exports.TimeSlot = require('./timeSlot.model');
 module.exports.Blog = require('./blog.model');
+module.exports.Affiliate = require('./affiliate.model');
 const { Schedule, DateException } = require('./schedule.model');
 module.exports.Schedule = Schedule;
 module.exports.DateException = DateException;

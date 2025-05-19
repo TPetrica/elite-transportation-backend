@@ -7,3 +7,5 @@ module.exports.serviceValidation = require('./service.validation');
 module.exports.dateExceptionValidation = require('./dateException.validation');
 module.exports.paymentValidation = require('./payment.validation');
 module.exports.availabilityValidation = require('./availability.validation');
+module.exports.blogValidation = require('./blog.validation');
+module.exports.affiliateValidation = require('./affiliate.validation');

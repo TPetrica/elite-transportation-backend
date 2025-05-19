@@ -5,6 +5,7 @@ const Extra = require('../models/extra.model');
 const User = require('../models/user.model');
 const availabilityService = require('./availability.service');
 const emailService = require('./email.service');
+const affiliateService = require('./affiliate.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
@@ -56,6 +57,17 @@ const createBooking = async (bookingBody) => {
     });
 
     logger.info(`Booking created with ID: ${booking._id}`);
+
+    // Track affiliate booking if applicable
+    if (bookingBody.affiliateCode) {
+      try {
+        await affiliateService.trackBooking(bookingBody.affiliateCode, booking.payment.amount);
+        logger.info(`Affiliate booking tracked for code: ${bookingBody.affiliateCode}`);
+      } catch (error) {
+        logger.error('Failed to track affiliate booking:', error);
+        // Don't throw error - continue with booking creation
+      }
+    }
 
     try {
       const emailData = {

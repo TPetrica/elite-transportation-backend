@@ -165,9 +165,9 @@ useEffect(() => {
 
 ```jsx
 // src/pages/pages/salt-lake-city.jsx
-import Footer1 from "@/components/footers/Footer1";
-import Header1 from "@/components/headers/Header1";
-import MobailHeader1 from "@/components/headers/MobailHeader1";
+import Footer from "@/components/footers/Footer";
+import Header from "@/components/headers/Header";
+import MobailHeader from "@/components/headers/MobailHeader";
 import MetaComponent from "@/components/common/MetaComponent";
 import SaltLakeCityContent from "@/components/saltLakeCity/SaltLakeCityContent";
 
@@ -180,11 +180,11 @@ export default function SaltLakeCityPage() {
   return (
     <>
       <MetaComponent meta={metadata} />
-      <Header1 /> <MobailHeader1 />
+      <Header /> <MobailHeader />
       <main className="main">
         <SaltLakeCityContent />
       </main>
-      <Footer1 />
+      <Footer />
     </>
   );
 }
