@@ -10,8 +10,6 @@ const { Payment } = require('../models');
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
 
-  console.log('req.body', req.body);
-  console.log('billingDetails', billingDetails);
   try {
     // Create Stripe Customer first
     const customer = await stripe.customers.create({

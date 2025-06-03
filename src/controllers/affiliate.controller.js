@@ -78,6 +78,7 @@ const validateAffiliate = catchAsync(async (req, res) => {
       defaultPickupLocation: affiliate.defaultPickupLocation,
       defaultDropoffLocation: affiliate.defaultDropoffLocation,
       servicePricing: affiliate.servicePricing,
+      servicePricingList: affiliate.servicePricingList, // Include the new pricing list
     }
   });
 });

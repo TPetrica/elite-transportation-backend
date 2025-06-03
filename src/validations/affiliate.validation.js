@@ -30,12 +30,19 @@ const createAffiliate = {
       isCustom: Joi.boolean().optional(),
       isCottonwood: Joi.boolean().optional(),
     }).allow(null).optional(),
-    preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group'),
+    preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
     servicePricing: Joi.object({
       basePrice: Joi.number().min(0),
       minPassengers: Joi.number().min(0).default(0),
       customDescription: Joi.string().trim(),
     }),
+    servicePricingList: Joi.array().items(
+      Joi.object({
+        serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+        basePrice: Joi.number().min(0),
+        minPassengers: Joi.number().min(0).default(0),
+      })
+    ),
   }),
 };
 
@@ -90,12 +97,19 @@ const updateAffiliate = {
         isCustom: Joi.boolean().optional(),
         isCottonwood: Joi.boolean().optional(),
       }).allow(null).optional(),
-      preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group'),
+      preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
       servicePricing: Joi.object({
         basePrice: Joi.number().min(0),
         minPassengers: Joi.number().min(0).default(0),
         customDescription: Joi.string().trim(),
       }),
+      servicePricingList: Joi.array().items(
+        Joi.object({
+          serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+          basePrice: Joi.number().min(0),
+          minPassengers: Joi.number().min(0).default(0),
+        })
+      ),
     })
     .min(1),
 };
