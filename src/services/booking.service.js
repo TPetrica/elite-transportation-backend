@@ -121,8 +121,22 @@ const createBooking = async (bookingBody) => {
         affiliateCode: booking.affiliateCode || '',
       };
 
+      // Send email to customer
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
       logger.info('Booking confirmation email sent to customer');
+      
+      // Send email to admin if configured
+      const config = require('../config/config');
+      if (config.email.adminEmail) {
+        await emailService.sendBookingConfirmationEmail(config.email.adminEmail, emailData);
+        logger.info('Booking confirmation email sent to admin');
+      }
+      
+      // Send email to affiliate company if configured
+      if (booking.affiliate && booking.affiliate.sendNotificationEmails && booking.affiliate.companyEmail) {
+        await emailService.sendBookingConfirmationEmail(booking.affiliate.companyEmail, emailData);
+        logger.info('Booking confirmation email sent to affiliate company');
+      }
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);
       // Don't throw an error here, just log it and continue

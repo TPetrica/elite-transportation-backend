@@ -23,6 +23,7 @@ const envVarsSchema = Joi.object()
     SMTP_USERNAME: Joi.string().description('username for email server'),
     SMTP_PASSWORD: Joi.string().description('password for email server'),
     EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
+    ADMIN_EMAIL: Joi.string().description('admin email to receive booking notifications'),
     GOOGLE_CLIENT_EMAIL: Joi.string().required().description('Google Calendar service account email'),
     GOOGLE_PRIVATE_KEY: Joi.string().required().description('Google Calendar service account private key'),
     GOOGLE_CALENDAR_ID: Joi.string().required().description('Google Calendar ID'),
@@ -70,6 +71,7 @@ module.exports = {
       },
     },
     from: envVars.EMAIL_FROM,
+    adminEmail: envVars.ADMIN_EMAIL,
   },
   google: {
     clientEmail: envVars.GOOGLE_CLIENT_EMAIL,

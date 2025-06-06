@@ -1,6 +1,6 @@
 const moment = require('moment');
 const httpStatus = require('http-status');
-const { Schedule, DateException } = require('../models');
+const { Schedule, DateException, ManualBooking } = require('../models');
 const Booking = require('../models/booking.model');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
@@ -158,14 +158,34 @@ class AvailabilityService {
     }
 
     const bookings = await Booking.find(query).select('pickup.time duration service');
+    
+    // Get manual bookings for the same date
+    const manualBookings = await ManualBooking.find({
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      isActive: true,
+    }).select('startTime endTime title type');
 
-    logger.debug(`Found ${bookings.length} bookings for ${requestedDate.format('YYYY-MM-DD')}`);
+    logger.debug(`Found ${bookings.length} bookings and ${manualBookings.length} manual bookings for ${requestedDate.format('YYYY-MM-DD')}`);
 
     // Get all blocked times based on bookings
     const blockedTimes = new Set();
     bookings.forEach((booking) => {
       const blockedRange = this.getBlockedTimeRange(booking.pickup.time);
       blockedRange.forEach((time) => blockedTimes.add(time));
+    });
+    
+    // Add manual booking blocked times
+    manualBookings.forEach((manualBooking) => {
+      const startMinutes = this.timeToMinutes(manualBooking.startTime);
+      const endMinutes = this.timeToMinutes(manualBooking.endTime);
+      
+      // Block all time slots that overlap with the manual booking
+      for (let minutes = startMinutes; minutes <= endMinutes; minutes += 30) {
+        blockedTimes.add(this.minutesToTime(minutes));
+      }
     });
 
     logger.debug(`Total blocked times: ${blockedTimes.size}`);

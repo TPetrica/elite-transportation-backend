@@ -38,6 +38,11 @@ const affiliateSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    sendNotificationEmails: {
+      type: Boolean,
+      default: false,
+      description: 'Whether to send booking notification emails to the affiliate company email',
+    },
     trackingUrl: {
       type: String,
       trim: true,
@@ -47,7 +52,7 @@ const affiliateSchema = mongoose.Schema(
       default: '/booking-time',
       trim: true,
     },
-    // Location configuration
+    // Global default location configuration (kept for backward compatibility)
     defaultPickupLocation: {
       address: {
         type: String,
@@ -119,6 +124,47 @@ const affiliateSchema = mongoose.Schema(
         type: Number,
         min: 0,
         default: 0,
+      },
+      customDescription: {
+        type: String,
+        trim: true,
+      },
+      // Service-specific locations
+      defaultPickupLocation: {
+        address: {
+          type: String,
+          trim: true,
+        },
+        coordinates: {
+          lat: { type: Number },
+          lng: { type: Number },
+        },
+        isCustom: {
+          type: Boolean,
+          default: false,
+        },
+        isCottonwood: {
+          type: Boolean,
+          default: false,
+        },
+      },
+      defaultDropoffLocation: {
+        address: {
+          type: String,
+          trim: true,
+        },
+        coordinates: {
+          lat: { type: Number },
+          lng: { type: Number },
+        },
+        isCustom: {
+          type: Boolean,
+          default: false,
+        },
+        isCottonwood: {
+          type: Boolean,
+          default: false,
+        },
       },
     }],
     trackingData: {

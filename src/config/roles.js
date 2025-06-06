@@ -5,8 +5,6 @@ const allRoles = {
     'manageUsers',
     'getBookings',
     'manageBookings',
-    'getVehicles',
-    'manageVehicles',
     'getExtras',
     'manageExtras',
     'getServices',
@@ -15,6 +13,8 @@ const allRoles = {
     'getBlogs',
     'manageBlogs',
     'manageAffiliates',
+    'getManualBookings',
+    'manageManualBookings',
   ],
 };
 

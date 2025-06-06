@@ -3,12 +3,12 @@ const authRoute = require('./auth.route');
 const userRoute = require('./user.route');
 const paymentRoute = require('./payment.route');
 const bookingRoute = require('./booking.route');
-const vehicleRoute = require('./vehicle.route');
 const extraRoute = require('./extra.route');
 const serviceRoute = require('./service.route');
 const availabilityRoute = require('./availability.route');
 const blogRoute = require('./blog.route');
 const affiliateRoute = require('./affiliate.route');
+const manualBookingRoute = require('./manualBooking.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
 
@@ -32,10 +32,6 @@ const defaultRoutes = [
     route: availabilityRoute,
   },
   {
-    path: '/vehicles',
-    route: vehicleRoute,
-  },
-  {
     path: '/extras',
     route: extraRoute,
   },
@@ -54,6 +50,10 @@ const defaultRoutes = [
   {
     path: '/affiliates',
     route: affiliateRoute,
+  },
+  {
+    path: '/manual-bookings',
+    route: manualBookingRoute,
   },
 ];
 

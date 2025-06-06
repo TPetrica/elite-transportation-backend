@@ -1,11 +1,11 @@
 module.exports.authValidation = require('./auth.validation');
 module.exports.userValidation = require('./user.validation');
 module.exports.bookingValidation = require('./booking.validation');
-module.exports.vehicleValidation = require('./vehicle.validation');
 module.exports.extraValidation = require('./extra.validation');
 module.exports.serviceValidation = require('./service.validation');
-module.exports.dateExceptionValidation = require('./dateException.validation');
+module.exports.dateExceptionValidation = require('./date-exception.validation');
 module.exports.paymentValidation = require('./payment.validation');
 module.exports.availabilityValidation = require('./availability.validation');
 module.exports.blogValidation = require('./blog.validation');
 module.exports.affiliateValidation = require('./affiliate.validation');
+module.exports.manualBookingValidation = require('./manualBooking.validation');

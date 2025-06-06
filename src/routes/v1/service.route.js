@@ -14,11 +14,11 @@ router.get('/type/:serviceType', serviceController.getServiceByServiceType);
 router
   .route('/')
   .post(auth('manageServices'), validate(serviceValidation.createService), serviceController.createService)
-  .get(auth('getServices'), validate(serviceValidation.getServices), serviceController.getServices);
+  .get(validate(serviceValidation.getServices), serviceController.getServices);
 
 router
   .route('/:serviceId')
-  .get(auth('getServices'), validate(serviceValidation.getService), serviceController.getService)
+  .get(validate(serviceValidation.getService), serviceController.getService)
   .patch(auth('manageServices'), validate(serviceValidation.updateService), serviceController.updateService)
   .delete(auth('manageServices'), validate(serviceValidation.deleteService), serviceController.deleteService);
 

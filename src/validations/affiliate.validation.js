@@ -10,6 +10,7 @@ const createAffiliate = {
     companyEmail: Joi.string().email(),
     commissionPercentage: Joi.number().min(0).max(100).default(10),
     isActive: Joi.boolean().default(true),
+    sendNotificationEmails: Joi.boolean().default(false),
     trackingUrl: Joi.string().uri(),
     redirectPath: Joi.string().default('/booking-time'),
     defaultPickupLocation: Joi.object({
@@ -41,6 +42,25 @@ const createAffiliate = {
         serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
         basePrice: Joi.number().min(0),
         minPassengers: Joi.number().min(0).default(0),
+        customDescription: Joi.string().trim().allow('').optional(),
+        defaultPickupLocation: Joi.object({
+          address: Joi.string().allow('').optional(),
+          coordinates: Joi.object({
+            lat: Joi.number(),
+            lng: Joi.number(),
+          }).allow(null).optional(),
+          isCustom: Joi.boolean().optional(),
+          isCottonwood: Joi.boolean().optional(),
+        }).allow(null).optional(),
+        defaultDropoffLocation: Joi.object({
+          address: Joi.string().allow('').optional(),
+          coordinates: Joi.object({
+            lat: Joi.number(),
+            lng: Joi.number(),
+          }).allow(null).optional(),
+          isCustom: Joi.boolean().optional(),
+          isCottonwood: Joi.boolean().optional(),
+        }).allow(null).optional(),
       })
     ),
   }),
@@ -77,6 +97,7 @@ const updateAffiliate = {
       companyEmail: Joi.string().email(),
       commissionPercentage: Joi.number().min(0).max(100),
       isActive: Joi.boolean(),
+      sendNotificationEmails: Joi.boolean(),
       trackingUrl: Joi.string().uri(),
       redirectPath: Joi.string(),
       defaultPickupLocation: Joi.object({
@@ -108,6 +129,25 @@ const updateAffiliate = {
           serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
           basePrice: Joi.number().min(0),
           minPassengers: Joi.number().min(0).default(0),
+          customDescription: Joi.string().trim().allow('').optional(),
+          defaultPickupLocation: Joi.object({
+            address: Joi.string().allow('').optional(),
+            coordinates: Joi.object({
+              lat: Joi.number(),
+              lng: Joi.number(),
+            }).allow(null).optional(),
+            isCustom: Joi.boolean().optional(),
+            isCottonwood: Joi.boolean().optional(),
+          }).allow(null).optional(),
+          defaultDropoffLocation: Joi.object({
+            address: Joi.string().allow('').optional(),
+            coordinates: Joi.object({
+              lat: Joi.number(),
+              lng: Joi.number(),
+            }).allow(null).optional(),
+            isCustom: Joi.boolean().optional(),
+            isCottonwood: Joi.boolean().optional(),
+          }).allow(null).optional(),
         })
       ),
     })
