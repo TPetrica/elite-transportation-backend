@@ -52,6 +52,7 @@ const createCheckoutSession = {
         luggage: Joi.string().required(),
         notes: Joi.string().allow(''),
         specialRequirements: Joi.string().allow(''),
+        company: Joi.string().allow(''),
       }),
       email: Joi.string().email().required(),
       affiliate: Joi.boolean().optional(),

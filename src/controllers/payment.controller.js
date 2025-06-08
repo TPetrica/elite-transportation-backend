@@ -72,8 +72,8 @@ const createCheckoutSession = catchAsync(async (req, res) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.CLIENT_URL}/booking-received?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/booking-payment`,
+      success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
       payment_intent_data: {
         metadata: {
           paymentId: tempPayment._id.toString(),
