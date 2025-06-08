@@ -41,6 +41,9 @@ const bookingSchema = mongoose.Schema(
       flightNumber: {
         type: String,
       },
+      flightTime: {
+        type: String,
+      },
       coordinates: {
         lat: { type: Number },
         lng: { type: Number },
@@ -96,6 +99,13 @@ const bookingSchema = mongoose.Schema(
       luggage: {
         type: Number,
         required: true,
+      },
+      skiBags: {
+        type: Number,
+        default: 0,
+      },
+      notes: {
+        type: String,
       },
       specialRequirements: {
         type: String,
