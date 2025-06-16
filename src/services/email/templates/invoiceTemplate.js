@@ -69,6 +69,7 @@ const invoiceTemplate = ({
         <td style="width: 50%; vertical-align: top; text-align: right; padding: 20px;">
           <div style="font-size: 14px; color: #525252;">
             <div style="font-weight: bold;">${customer.name}</div>
+            ${customer.company ? `<div>${customer.company}</div>` : ''}
             ${customer.address ? `<div>${customer.address}</div>` : ''}
             ${customer.city && customer.postCode ? `<div>${customer.city}, ${customer.postCode}</div>` : ''}
             ${customer.country ? `<div>${customer.country}</div>` : ''}
@@ -96,7 +97,10 @@ const invoiceTemplate = ({
             return `
               <tr style="border-bottom: 1px solid #e5e7eb;">
                 <td style="padding: 10px;">${index + 1}.</td>
-                <td style="padding: 10px;">${product.name}</td>
+                <td style="padding: 10px;">
+                  ${product.name}
+                  ${product.description ? `<br><small style="color: #666; font-size: 12px;">${product.description}</small>` : ''}
+                </td>
                 <td style="padding: 10px; text-align: right;">${currencySymbol}${product.price.toFixed(2)}</td>
                 <td style="padding: 10px; text-align: center;">${product.quantity}</td>
                 <td style="padding: 10px; text-align: right;">${currencySymbol}${productTotal.toFixed(2)}</td>

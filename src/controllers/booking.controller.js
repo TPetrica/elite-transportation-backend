@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { bookingService, emailService } = require('../services');
+const { bookingService } = require('../services');
+const emailService = require('../services/email/emailService');
 const ApiError = require('../utils/ApiError');
 const pick = require('../utils/pick');
 const logger = require('../config/logger');

@@ -4,14 +4,13 @@ const Booking = require('../models/booking.model');
 const Extra = require('../models/extra.model');
 const User = require('../models/user.model');
 const availabilityService = require('./availability.service');
-const emailService = require('./email.service');
+const emailService = require('./email/emailService');
 const affiliateService = require('./affiliate.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const { convertTo24Hour } = require('../utils/timeFormat');
 
 const createBooking = async (bookingBody) => {
-  console.log('bookingBody', bookingBody);
-
   try {
     logger.info('Starting booking creation process');
 
@@ -26,6 +25,7 @@ const createBooking = async (bookingBody) => {
         const extraDoc = extras.find((e) => e._id.toString() === extra.item.toString());
         return {
           ...extra,
+          name: extra.name || extraDoc.name, // Preserve the name from frontend or use from DB
           price: extraDoc.price * extra.quantity,
         };
       });
@@ -37,10 +37,14 @@ const createBooking = async (bookingBody) => {
         throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
       }
     }
+    
+    // Convert pickup time from AM/PM to 24-hour format for availability check
+    const pickupTime24h = convertTo24Hour(bookingBody.pickup.time);
+    logger.info(`Converting pickup time from ${bookingBody.pickup.time} to ${pickupTime24h}`);
 
     const isAvailable = await availabilityService.checkTimeSlotAvailability(
       bookingBody.pickup.date,
-      bookingBody.pickup.time
+      pickupTime24h
     );
 
     if (!isAvailable) {
@@ -48,9 +52,26 @@ const createBooking = async (bookingBody) => {
     }
 
     const bookingNumber = await Booking.generateBookingNumber();
+    
+    // Convert times to 24-hour format for storage
+    const bookingDataForStorage = {
+      ...bookingBody,
+      pickup: {
+        ...bookingBody.pickup,
+        time: pickupTime24h
+      }
+    };
+    
+    // Convert return time if exists
+    if (bookingBody.returnDetails?.time) {
+      bookingDataForStorage.returnDetails = {
+        ...bookingBody.returnDetails,
+        time: convertTo24Hour(bookingBody.returnDetails.time)
+      };
+    }
 
     const booking = await Booking.create({
-      ...bookingBody,
+      ...bookingDataForStorage,
       bookingNumber,
       affiliate: bookingBody.affiliate || false,
       affiliateCode: bookingBody.affiliateCode || '',
@@ -116,9 +137,27 @@ const createBooking = async (bookingBody) => {
           status: booking.payment.status,
           currency: 'USD',
         },
-        extras: booking.extras || [],
+        extras: (booking.extras || []).map(extra => ({
+          item: extra.item,
+          name: extra.name || 'Extra Service',
+          quantity: extra.quantity || 1,
+          price: extra.price || 0
+        })),
         affiliate: booking.affiliate,
         affiliateCode: booking.affiliateCode || '',
+        // Add pricing details
+        pricing: booking.pricing || {
+          basePrice: 0,
+          extrasTotal: 0,
+          gratuity: 0,
+          nightFee: 0,
+          selectedTipPercentage: 0,
+          totalPrice: 0
+        },
+        // Add round trip details
+        isRoundTrip: booking.isRoundTrip || false,
+        tripType: booking.tripType || 'one-way',
+        returnDetails: booking.returnDetails || null,
       };
 
       // Send email to customer
@@ -133,9 +172,21 @@ const createBooking = async (bookingBody) => {
       }
       
       // Send email to affiliate company if configured
-      if (booking.affiliate && booking.affiliate.sendNotificationEmails && booking.affiliate.companyEmail) {
-        await emailService.sendBookingConfirmationEmail(booking.affiliate.companyEmail, emailData);
-        logger.info('Booking confirmation email sent to affiliate company');
+      if (booking.affiliate && booking.affiliateCode) {
+        try {
+          const affiliate = await affiliateService.getAffiliateByCode(booking.affiliateCode);
+          if (affiliate && affiliate.sendNotificationEmails && affiliate.companyEmail) {
+            await emailService.sendBookingConfirmationEmail(affiliate.companyEmail, emailData, `[Affiliate: ${affiliate.name}] `);
+            logger.info('Booking confirmation email sent to affiliate company:', {
+              affiliateCode: booking.affiliateCode,
+              affiliateName: affiliate.name,
+              email: affiliate.companyEmail
+            });
+          }
+        } catch (affiliateError) {
+          logger.error('Failed to send affiliate notification email:', affiliateError);
+          // Don't throw - continue without affiliate email
+        }
       }
     } catch (error) {
       logger.error('Failed to send confirmation email:', error);

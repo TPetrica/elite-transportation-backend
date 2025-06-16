@@ -19,6 +19,9 @@ const CALENDAR_CREDENTIALS = {
 };
 
 const CALENDAR_ID = 'elitetransportationpc@gmail.com';
+// Utah is in Mountain Time Zone
+const TIMEZONE = 'America/Denver';
+
 class CalendarService {
   constructor() {
     try {
@@ -43,17 +46,68 @@ class CalendarService {
 
   async createEvent(booking) {
     try {
-      // Format the date from the Date object
-      const pickupDate = moment(booking.pickup.date).format('YYYY-MM-DD');
-      const pickupTime = booking.pickup.time;
+      const events = [];
+      
+      // Create first trip event
+      const firstEvent = await this.createSingleEvent(booking, false);
+      if (firstEvent) events.push(firstEvent);
+      
+      // Create return trip event if it's a round trip
+      if (booking.isRoundTrip && booking.returnDetails) {
+        const returnEvent = await this.createSingleEvent(booking, true);
+        if (returnEvent) events.push(returnEvent);
+      }
+      
+      return events;
+    } catch (error) {
+      logger.error('Error creating calendar events:', {
+        error: error.message,
+        bookingNumber: booking.bookingNumber,
+        stack: error.stack,
+      });
+      return [];
+    }
+  }
+  
+  async createSingleEvent(booking, isReturn = false) {
+    try {
+      let pickupDate, pickupTime, pickupAddress, dropoffAddress;
+      
+      if (isReturn) {
+        // Use return trip details
+        pickupDate = moment(booking.returnDetails.date).format('YYYY-MM-DD');
+        pickupTime = booking.returnDetails.time;
+        pickupAddress = booking.returnDetails.pickupAddress;
+        dropoffAddress = booking.returnDetails.dropoffAddress;
+      } else {
+        // Use original trip details
+        // Parse date as UTC to avoid timezone shifts
+        const dateObj = new Date(booking.pickup.date);
+        pickupDate = moment.utc(dateObj).format('YYYY-MM-DD');
+        pickupTime = booking.pickup.time;
+        pickupAddress = booking.pickup.address;
+        dropoffAddress = booking.dropoff.address;
+      }
 
-      // Create the datetime
-      const pickupDateTime = moment(`${pickupDate} ${pickupTime}`, 'YYYY-MM-DD HH:mm');
+      // Ensure time is in 24-hour format (HH:mm)
+      // The booking service should have already converted it, but let's be safe
+      if (pickupTime.includes('AM') || pickupTime.includes('PM')) {
+        // Convert from 12-hour to 24-hour format
+        const time12h = moment(pickupTime, ['h:mm A', 'hh:mm A'], true);
+        if (time12h.isValid()) {
+          pickupTime = time12h.format('HH:mm');
+        }
+      }
 
-      logger.info('Creating event with datetime:', {
-        originalDate: booking.pickup.date,
+      // Create the datetime - parse as local time in the Mountain Time zone (Utah)
+      const pickupDateTime = moment.tz(`${pickupDate} ${pickupTime}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
+
+      logger.info(`Creating ${isReturn ? 'return' : 'initial'} event with datetime:`, {
+        originalDate: isReturn ? booking.returnDetails.date : booking.pickup.date,
         formattedDate: pickupDate,
         time: pickupTime,
+        parsedTime: pickupDateTime.format('YYYY-MM-DD HH:mm:ss'),
+        timezone: TIMEZONE,
         combined: pickupDateTime.format(),
       });
 
@@ -64,11 +118,11 @@ class CalendarService {
       const endDateTime = moment(pickupDateTime).add(30, 'minutes');
 
       const event = {
-        summary: `Ride #${booking.bookingNumber}`,
+        summary: `Ride #${booking.bookingNumber}${isReturn ? ' (Return)' : ''}`,
         description: `
-Pickup: ${booking.pickup.address}
-Dropoff: ${booking.dropoff.address}
-Flight Number: ${booking.pickup.flightNumber || 'N/A'}
+Pickup: ${pickupAddress}
+Dropoff: ${dropoffAddress}
+Flight Number: ${!isReturn && booking.pickup.flightNumber ? booking.pickup.flightNumber : 'N/A'}
 
 Passenger Details:
 - Name: ${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}
@@ -82,18 +136,18 @@ ${
     : ''
 }
 
-Service: ${booking.service}
+Service: ${booking.service}${isReturn ? ' (Return Trip)' : ''}
 Distance: ${booking.distance.miles} miles
 Duration: ${booking.duration}
 Amount: $${booking.payment.amount}
         `.trim(),
         start: {
           dateTime: pickupDateTime.format('YYYY-MM-DDTHH:mm:ss'),
-          timeZone: 'America/New_York',
+          timeZone: TIMEZONE,
         },
         end: {
           dateTime: endDateTime.format('YYYY-MM-DDTHH:mm:ss'),
-          timeZone: 'America/New_York',
+          timeZone: TIMEZONE,
         },
         // Color coding based on service
         colorId:
@@ -109,10 +163,11 @@ Amount: $${booking.payment.amount}
         resource: event,
       });
 
-      logger.info('Calendar event created successfully:', {
+      logger.info(`Calendar ${isReturn ? 'return' : 'initial'} event created successfully:`, {
         bookingNumber: booking.bookingNumber,
         eventId: response.data.id,
         link: response.data.htmlLink,
+        isReturn,
       });
 
       return response.data;

@@ -1,11 +1,11 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const { paymentService, bookingService, smsService, calendarService } = require('../services');
+const emailService = require('../services/email/emailService');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
-const { sendInvoiceEmail } = require('../services/email.service');
-const { Payment } = require('../models');
+const { Payment, Booking } = require('../models');
 
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
@@ -138,6 +138,20 @@ const handleWebhook = async (req, res) => {
           if (!payment) {
             throw new Error('Payment record not found');
           }
+          
+          // Check if booking already exists for this session (idempotency check)
+          const existingBooking = await Booking.findOne({ 
+            'payment.stripeSessionId': session.id 
+          });
+          
+          if (existingBooking) {
+            logger.info('Booking already exists for session, skipping duplicate processing:', {
+              sessionId: session.id,
+              bookingId: existingBooking._id,
+              bookingNumber: existingBooking.bookingNumber
+            });
+            break; // Exit early, booking already processed
+          }
 
           const bookingData = JSON.parse(payment.metadata.bookingData);
 
@@ -173,7 +187,7 @@ const handleWebhook = async (req, res) => {
           // Send notifications
           try {
             // Send invoice email
-            await sendInvoiceEmail(session.customer_details.email, session.payment_intent, session, booking);
+            await emailService.sendInvoiceEmail(session.customer_details.email, session.payment_intent, session, booking);
 
             // Send SMS if phone number exists
             if (booking.passengerDetails?.phone) {

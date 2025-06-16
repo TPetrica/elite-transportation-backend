@@ -66,6 +66,7 @@
     "moment-timezone": "^0.5.47",
     "mongoose": "^5.7.7",
     "morgan": "^1.9.1",
+    "node-cron": "^4.1.0",
     "nodemailer": "^6.3.1",
     "passport": "^0.4.0",
     "passport-jwt": "^4.0.0",

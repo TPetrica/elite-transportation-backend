@@ -118,6 +118,10 @@ const bookingSchema = mongoose.Schema(
           type: mongoose.SchemaTypes.ObjectId,
           ref: 'Extra',
         },
+        name: {
+          type: String,
+          required: false,
+        },
         quantity: {
           type: Number,
           default: 1,
@@ -193,6 +197,39 @@ const bookingSchema = mongoose.Schema(
     },
     affiliate: { type: Boolean, default: false },
     affiliateCode: { type: String, default: '' },
+    
+    // Round trip details
+    isRoundTrip: { type: Boolean, default: false },
+    tripType: { 
+      type: String, 
+      enum: ['one-way', 'round-trip'],
+      default: 'one-way'
+    },
+    returnDetails: {
+      date: { type: Date },
+      time: { type: String },
+      pickupAddress: { type: String },
+      pickupCoordinates: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+      dropoffAddress: { type: String },
+      dropoffCoordinates: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+      reminderSent: { type: Boolean, default: false },
+    },
+    
+    // Pricing breakdown
+    pricing: {
+      basePrice: { type: Number, default: 0 },
+      extrasTotal: { type: Number, default: 0 },
+      gratuity: { type: Number, default: 0 },
+      nightFee: { type: Number, default: 0 },
+      selectedTipPercentage: { type: Number, default: 0 },
+      totalPrice: { type: Number, default: 0 },
+    },
   },
   {
     timestamps: true,

@@ -70,6 +70,8 @@ const getSessionById = async (sessionId) => {
             : null,
           duration: parsedBookingData.duration,
           passengerDetails: parsedBookingData.passengerDetails,
+          isRoundTrip: parsedBookingData.isRoundTrip || false,
+          returnDetails: parsedBookingData.returnDetails || null,
         };
       } catch (error) {
         logger.error('Error parsing booking data from metadata:', error);
@@ -90,6 +92,8 @@ const getSessionById = async (sessionId) => {
           : null,
         duration: payment.booking.duration,
         passengerDetails: payment.booking.passengerDetails,
+        isRoundTrip: payment.booking.isRoundTrip || false,
+        returnDetails: payment.booking.returnDetails || null,
       };
     }
 
