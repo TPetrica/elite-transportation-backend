@@ -33,6 +33,10 @@ const getFromAirportInstructions = () => `
       <div class="step-title">Kindly do not cross the pedestrian bridge.</div>
     </div>
   </div>
+  
+  <div class="image-container" style="text-align: center; margin: 20px 0;">
+    <img src="https://res.cloudinary.com/dxncqwsnw/image/upload/v1750188640/image1_bn5bdr.jpg" alt="Do not cross pedestrian bridge" style="max-width: 100%; height: auto; border-radius: 8px;">
+  </div>
 
   <div class="step">
     <div class="step-icon">➡️</div>
@@ -41,6 +45,14 @@ const getFromAirportInstructions = () => `
       <p>Proceed through the first set of doors to reach the outside.</p>
     </div>
   </div>
+  
+  <div class="image-container" style="text-align: center; margin: 20px 0;">
+    <img src="https://res.cloudinary.com/dxncqwsnw/image/upload/v1750188639/image2_fjzvsr.jpg" alt="Turn right after elevators" style="max-width: 100%; height: auto; border-radius: 8px;">
+  </div>
+  
+  <div class="image-container" style="text-align: center; margin: 20px 0;">
+    <img src="https://res.cloudinary.com/dxncqwsnw/image/upload/v1750188639/image3_ukucip.jpg" alt="Proceed through doors" style="max-width: 100%; height: auto; border-radius: 8px;">
+  </div>
 
   <div class="step">
     <div class="step-icon">📩</div>
@@ -48,6 +60,10 @@ const getFromAirportInstructions = () => `
       <div class="step-title">Kindly notify us once you are outside</div>
       <p>We will proceed to the designated pick-up area. We will be arriving in a black Ford Expedition marked with Elite Transportation on the side.</p>
     </div>
+  </div>
+  
+  <div class="image-container" style="text-align: center; margin: 20px 0;">
+    <img src="https://res.cloudinary.com/dxncqwsnw/image/upload/v1750188639/image4_bqpt9s.jpg" alt="Elite Transportation vehicle" style="max-width: 100%; height: auto; border-radius: 8px;">
   </div>
 
   <div class="contact-info">
