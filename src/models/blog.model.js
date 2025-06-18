@@ -56,6 +56,11 @@ const blogSchema = mongoose.Schema(
     publishedAt: {
       type: Date,
     },
+    readTime: {
+      type: String,
+      trim: true,
+      default: '5 min read',
+    },
   },
   {
     timestamps: true,

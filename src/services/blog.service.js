@@ -2,6 +2,7 @@ const httpStatus = require('http-status');
 const { Blog } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const calculateReadTime = require('../utils/calculateReadTime');
 
 /**
  * Create a blog post
@@ -14,6 +15,11 @@ const createBlog = async (blogBody) => {
   }
 
   try {
+    // Calculate read time if not provided
+    if (!blogBody.readTime && blogBody.content) {
+      blogBody.readTime = calculateReadTime(blogBody.content);
+    }
+    
     return await Blog.create(blogBody);
   } catch (error) {
     logger.error('Error creating blog post:', error);
@@ -32,7 +38,12 @@ const createBlog = async (blogBody) => {
  */
 const queryBlogs = async (filter, options) => {
   try {
-    const blogs = await Blog.paginate(filter, options);
+    // Add author population to options
+    const populateOptions = {
+      ...options,
+      populate: 'author.name,author.email'
+    };
+    const blogs = await Blog.paginate(filter, populateOptions);
     return blogs;
   } catch (error) {
     logger.error('Error querying blogs:', error);
@@ -93,6 +104,11 @@ const updateBlogById = async (blogId, updateBody) => {
       updateBody.publishedAt = new Date();
     }
 
+    // Recalculate read time if content is updated
+    if (updateBody.content && updateBody.content !== blog.content) {
+      updateBody.readTime = calculateReadTime(updateBody.content);
+    }
+
     Object.assign(blog, updateBody);
     await blog.save();
     return blog;
@@ -129,7 +145,12 @@ const deleteBlogById = async (blogId) => {
 const getPublishedBlogs = async (options) => {
   try {
     const filter = { isPublished: true };
-    return await Blog.paginate(filter, options);
+    // Add author population to options
+    const populateOptions = {
+      ...options,
+      populate: 'author.name,author.email'
+    };
+    return await Blog.paginate(filter, populateOptions);
   } catch (error) {
     logger.error('Error getting published blogs:', error);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to get published blogs');
@@ -145,7 +166,12 @@ const getPublishedBlogs = async (options) => {
 const getBlogsByCategory = async (category, options) => {
   try {
     const filter = { category, isPublished: true };
-    return await Blog.paginate(filter, options);
+    // Add author population to options
+    const populateOptions = {
+      ...options,
+      populate: 'author.name,author.email'
+    };
+    return await Blog.paginate(filter, populateOptions);
   } catch (error) {
     logger.error(`Error getting blogs by category ${category}:`, error);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to get blogs by category');
