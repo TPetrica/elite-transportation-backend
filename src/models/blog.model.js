@@ -25,7 +25,7 @@ const blogSchema = mongoose.Schema(
     },
     featuredImage: {
       type: String,
-      default: '/assets/imgs/page/blog/default.jpg',
+      default: '',
     },
     category: {
       type: String,
