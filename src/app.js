@@ -71,7 +71,7 @@ const corsOptions = {
     'http://localhost:3002',
     'https://luxury-nextjs.vercel.app',
     'https://checkout.stripe.com',
-    'https://elite-transportation.netlify.app/',
+    'https://elite-transportation.netlify.app',
     'https://elitetransportationpc.com',
     /\.stripe\.com$/,
     config.clientUrl,
