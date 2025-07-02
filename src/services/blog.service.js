@@ -139,18 +139,46 @@ const deleteBlogById = async (blogId) => {
 
 /**
  * Get published blogs
+ * @param {Object} filter - Filter options for published blogs
  * @param {Object} options - Query options
  * @returns {Promise<QueryResult>}
  */
-const getPublishedBlogs = async (options) => {
+const getPublishedBlogs = async (filter = {}, options) => {
   try {
-    const filter = { isPublished: true };
+    // Base filter for published blogs
+    const baseFilter = { isPublished: true };
+    
+    // Add category filter if provided
+    if (filter.category) {
+      baseFilter.category = filter.category;
+    }
+    
+    // Add tag filter if provided
+    if (filter.tags) {
+      // Support both single tag and multiple tags
+      if (Array.isArray(filter.tags)) {
+        baseFilter.tags = { $in: filter.tags };
+      } else {
+        baseFilter.tags = { $in: [filter.tags] };
+      }
+    }
+    
+    // Add search filter if provided
+    if (filter.search) {
+      baseFilter.$or = [
+        { title: { $regex: filter.search, $options: 'i' } },
+        { excerpt: { $regex: filter.search, $options: 'i' } },
+        { content: { $regex: filter.search, $options: 'i' } }
+      ];
+    }
+    
     // Add author population to options
     const populateOptions = {
       ...options,
       populate: 'author.name,author.email'
     };
-    return await Blog.paginate(filter, populateOptions);
+    
+    return await Blog.paginate(baseFilter, populateOptions);
   } catch (error) {
     logger.error('Error getting published blogs:', error);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to get published blogs');
@@ -200,6 +228,20 @@ const getRelatedBlogs = async (blogId, category, limit = 3) => {
   }
 };
 
+/**
+ * Get all tags from published blogs
+ * @returns {Promise<string[]>}
+ */
+const getPublishedBlogTags = async () => {
+  try {
+    const tags = await Blog.distinct('tags', { isPublished: true });
+    return tags.filter(tag => tag && tag.trim() !== ''); // Remove empty tags
+  } catch (error) {
+    logger.error('Error getting published blog tags:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to get blog tags');
+  }
+};
+
 module.exports = {
   createBlog,
   queryBlogs,
@@ -210,4 +252,5 @@ module.exports = {
   getPublishedBlogs,
   getBlogsByCategory,
   getRelatedBlogs,
+  getPublishedBlogTags,
 };

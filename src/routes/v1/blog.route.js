@@ -8,6 +8,7 @@ const router = express.Router();
 
 // Public routes - available to all users without authentication
 router.get('/public', blogController.getPublishedBlogs);
+router.get('/public/tags', blogController.getPublishedBlogTags);
 router.get('/public/slug/:slug', validate(blogValidation.getBlogBySlug), blogController.getBlogBySlug);
 router.get('/public/category/:category', validate(blogValidation.getBlogsByCategory), blogController.getBlogsByCategory);
 router.get('/public/related/:blogId', validate(blogValidation.getRelatedBlogs), blogController.getRelatedBlogs);

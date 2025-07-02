@@ -28,14 +28,21 @@ const getBlogs = catchAsync(async (req, res) => {
  * Get published blogs (public)
  */
 const getPublishedBlogs = catchAsync(async (req, res) => {
+  const filter = pick(req.query, ['category', 'tags', 'tag', 'search']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  
+  // Support both 'tag' and 'tags' parameters
+  if (filter.tag && !filter.tags) {
+    filter.tags = filter.tag;
+    delete filter.tag;
+  }
   
   // Default sort by publishedAt desc if not specified
   if (!options.sortBy) {
     options.sortBy = 'publishedAt:desc';
   }
   
-  const result = await blogService.getPublishedBlogs(options);
+  const result = await blogService.getPublishedBlogs(filter, options);
   res.send(result);
 });
 
@@ -106,6 +113,14 @@ const deleteBlog = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+/**
+ * Get published blog tags (public)
+ */
+const getPublishedBlogTags = catchAsync(async (req, res) => {
+  const tags = await blogService.getPublishedBlogTags();
+  res.send({ tags });
+});
+
 module.exports = {
   createBlog,
   getBlogs,
@@ -116,4 +131,5 @@ module.exports = {
   getRelatedBlogs,
   updateBlog,
   deleteBlog,
+  getPublishedBlogTags,
 };
