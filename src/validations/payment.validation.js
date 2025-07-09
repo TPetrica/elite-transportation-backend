@@ -38,10 +38,10 @@ const createCheckoutSession = {
         isCustom: Joi.boolean().optional(),
       }),
       distance: Joi.object({
-        km: Joi.number().optional(),
-        miles: Joi.number().optional(),
-      }).optional(),
-      duration: Joi.string().optional(),
+        km: Joi.number().allow(null).optional(),
+        miles: Joi.number().allow(null).optional(),
+      }).allow(null).optional(),
+      duration: Joi.string().allow('', null).optional(),
       service: Joi.string()
         .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
         .required(),
