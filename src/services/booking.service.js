@@ -366,7 +366,13 @@ const updateBookingById = async (bookingId, updateBody) => {
     }
 
     // Check if pickup date or time is being updated
-    const isDateTimeChange = updateBody.pickup?.date || updateBody.pickup?.time;
+    const oldDate = moment(booking.pickup.date).format('YYYY-MM-DD');
+    const oldTime = booking.pickup.time;
+    
+    const newDate = updateBody.pickup?.date ? moment(updateBody.pickup.date).format('YYYY-MM-DD') : oldDate;
+    const newTime = updateBody.pickup?.time || oldTime;
+    
+    const dateTimeHasChanged = oldDate !== newDate || oldTime !== newTime;
     const updatedDateTime = {};
 
     if (updateBody.pickup?.date) {
@@ -396,7 +402,7 @@ const updateBookingById = async (bookingId, updateBody) => {
 
     // If updating time/date, check if the new slot is available
     // but make an exception for the current booking's time slot
-    if (isDateTimeChange) {
+    if (dateTimeHasChanged) {
       const newDate = updateBody.pickup?.date || booking.pickup.date;
       const newTime = updateBody.pickup?.time || booking.pickup.time;
 
@@ -424,7 +430,7 @@ const updateBookingById = async (bookingId, updateBody) => {
     await booking.save();
 
     // Send update email if date/time was changed (non-blocking)
-    if (isDateTimeChange) {
+    if (dateTimeHasChanged) {
       // Don't await - send email in background to avoid blocking the HTTP response
       emailService.sendBookingUpdateEmail(booking.email, booking.bookingNumber, booking.passengerDetails, {
         pickup: updatedDateTime,
