@@ -10,6 +10,9 @@ const { Payment, Booking } = require('../models');
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData } = req.body;
 
+  console.log('amount', amount)
+  console.log('billingDetails', billingDetails)
+  console.log('bookingData hereee', bookingData)
   try {
     // Create Stripe Customer first
     const customer = await stripe.customers.create({
@@ -54,33 +57,93 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       },
     });
 
+    // Calculate tax using Stripe Tax API
+    let taxCalculation = null;
+    let taxAmount = 0;
+    
+    try {
+      // Create tax calculation
+      taxCalculation = await stripe.tax.calculations.create({
+        currency: 'usd',
+        line_items: [
+          {
+            amount: Math.round(amount * 100),
+            reference: 'transportation-service',
+          },
+        ],
+        customer_details: {
+          address: {
+            line1: bookingData.dropoff.address,
+            city: bookingData.dropoff.city,
+            state: bookingData.dropoff.state,
+            postal_code: bookingData.dropoff.zipCode,
+            country: bookingData.dropoff.country || 'US',
+          },
+          address_source: 'shipping',
+        },
+      });
+      
+      taxAmount = taxCalculation.tax_amount_exclusive;
+      
+      logger.info('Tax calculation created:', {
+        calculationId: taxCalculation.id,
+        taxAmount,
+        totalAmount: taxCalculation.amount_total,
+      });
+    } catch (taxError) {
+      logger.warn('Tax calculation failed, proceeding without tax:', {
+        error: taxError.message,
+        billingDetails,
+      });
+    }
+    
+    // Create line items array
+    const lineItems = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Transportation Service',
+            description: `From ${bookingData.pickup.address} to ${bookingData.dropoff.address}`,
+          },
+          unit_amount: Math.round(amount * 100),
+        },
+        quantity: 1,
+      },
+    ];
+    
+    // Add tax as separate line item if calculated
+    if (taxAmount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Tax',
+            description: 'Sales Tax',
+          },
+          unit_amount: taxAmount,
+        },
+        quantity: 1,
+      });
+    }
+    
     // Create Stripe Session
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Transportation Service',
-              description: `From ${bookingData.pickup.address} to ${bookingData.dropoff.address}`,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: 'payment',
       success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
       payment_intent_data: {
         metadata: {
           paymentId: tempPayment._id.toString(),
+          taxCalculationId: taxCalculation?.id || '',
         },
       },
       metadata: {
         paymentId: tempPayment._id.toString(),
+        taxCalculationId: taxCalculation?.id || '',
       },
     });
 
@@ -155,6 +218,19 @@ const handleWebhook = async (req, res) => {
 
           const bookingData = JSON.parse(payment.metadata.bookingData);
 
+          // Debug logging for webhook booking data
+          logger.info('=== STRIPE WEBHOOK DEBUG DATA ===');
+          logger.info('Raw booking data from payment metadata:', bookingData);
+          logger.info('Pickup date from webhook:', bookingData.pickup?.date);
+          logger.info('Pickup time from webhook:', bookingData.pickup?.time);
+          logger.info('Webhook date type:', typeof bookingData.pickup?.date);
+          logger.info('Webhook time type:', typeof bookingData.pickup?.time);
+          if (bookingData.pickup?.date) {
+            logger.info('Webhook date as Date object:', new Date(bookingData.pickup.date));
+            logger.info('Webhook date ISO:', new Date(bookingData.pickup.date).toISOString());
+          }
+          logger.info('==================================');
+
           // Create the booking now that payment is completed
           const booking = await bookingService.createBooking({
             ...bookingData,
@@ -180,6 +256,29 @@ const handleWebhook = async (req, res) => {
             'metadata.bookingNumber': booking.bookingNumber,
             stripePaymentIntentId: session.payment_intent,
           });
+
+          // Create tax transaction if tax calculation exists
+          if (session.metadata.taxCalculationId) {
+            try {
+              const taxTransaction = await stripe.tax.transactions.createFromCalculation({
+                calculation: session.metadata.taxCalculationId,
+                reference: session.payment_intent,
+                expand: ['line_items'],
+              });
+              
+              logger.info('Tax transaction created:', {
+                transactionId: taxTransaction.id,
+                calculationId: session.metadata.taxCalculationId,
+                paymentIntent: session.payment_intent,
+              });
+            } catch (taxError) {
+              logger.error('Tax transaction creation failed:', {
+                error: taxError.message,
+                calculationId: session.metadata.taxCalculationId,
+                sessionId: session.id,
+              });
+            }
+          }
 
           // Create calendar event
           await calendarService.createEvent(booking);

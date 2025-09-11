@@ -98,19 +98,57 @@ const getFromAirportTemplate = (bookingData) => {
             <div class="address-label">Drop-off Location</div>
             <div class="address">${bookingData.dropoff.address}</div>
           </div>
-          ${bookingData.pickup.flightNumber ? `
+          ${bookingData.passengerDetails?.flightNumber ? `
           <div class="address-section">
             <div class="address-label">Flight Number</div>
-            <div class="address">${bookingData.pickup.flightNumber}</div>
+            <div class="address">${bookingData.passengerDetails.flightNumber}</div>
           </div>
           ` : ''}
           ${getExtrasListHTML(bookingData.extras)}
         </div>
+        <div class="passenger-info">
+          <div class="info-row">
+            <div class="info-label">Passenger Name</div>
+            <div class="info-value">${bookingData.passengerDetails.firstName} ${bookingData.passengerDetails.lastName}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Phone</div>
+            <div class="info-value">${bookingData.passengerDetails.phone}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Email</div>
+            <div class="info-value">${bookingData.passengerDetails.email}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Passengers</div>
+            <div class="info-value">${bookingData.passengerDetails.passengers}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Luggage</div>
+            <div class="info-value">${bookingData.passengerDetails.luggage}</div>
+          </div>
+          ${bookingData.passengerDetails.company ? `
+          <div class="info-row">
+            <div class="info-label">Company</div>
+            <div class="info-value">${bookingData.passengerDetails.company}</div>
+          </div>
+          ` : ''}
+          ${bookingData.passengerDetails.specialRequirements ? `
+          <div class="info-row">
+            <div class="info-label">Special Requirements</div>
+            <div class="info-value">${bookingData.passengerDetails.specialRequirements}</div>
+          </div>
+          ` : ''}
+          ${bookingData.passengerDetails.notes ? `
+          <div class="info-row">
+            <div class="info-label">Notes</div>
+            <div class="info-value">${bookingData.passengerDetails.notes}</div>
+          </div>
+          ` : ''}
+        </div>
       </div>
       
       ${getFromAirportInstructions()}
-      
-      ${getNotesHTML(bookingData.passengerDetails?.notes)}
       
       ${getReturnTripHTML(bookingData.returnDetails)}
       

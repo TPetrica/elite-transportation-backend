@@ -102,6 +102,8 @@ const updateBooking = {
   body: Joi.object()
     .keys({
       status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+      service: Joi.string()
+        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons'),
       pickup: Joi.object().keys({
         address: Joi.string(),
         date: Joi.date(),
@@ -136,7 +138,7 @@ const updateBooking = {
       }),
       extras: Joi.array().items(
         Joi.object().keys({
-          item: Joi.string().custom(objectId).required(),
+          item: Joi.string().custom(objectId),
           quantity: Joi.number().integer().min(1).default(1),
           price: Joi.number(),
         })

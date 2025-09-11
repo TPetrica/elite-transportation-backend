@@ -28,6 +28,7 @@ const createPayment = async (paymentData) => {
       });
     }
 
+    logger.info('Payment data:', paymentData);
     logger.info('Payment created successfully:', { paymentId: payment._id });
     return payment;
   } catch (error) {

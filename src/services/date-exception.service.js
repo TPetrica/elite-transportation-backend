@@ -135,11 +135,9 @@ const updateDateExceptionById = async (exceptionId, updateBody) => {
       }
     }
 
-    // Set type based on timeRanges
-    if (updateBody.timeRanges && updateBody.timeRanges.length > 0) {
-      updateBody.type = 'custom-hours';
-    } else if (updateBody.type === 'custom-hours' && (!updateBody.timeRanges || updateBody.timeRanges.length === 0)) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Custom hours type requires at least one time range');
+    // Validate time ranges for types that require them
+    if ((updateBody.type === 'custom-hours' || updateBody.type === 'blocked-hours') && (!updateBody.timeRanges || updateBody.timeRanges.length === 0)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, `${updateBody.type} type requires at least one time range`);
     }
 
     Object.assign(exception, updateBody);

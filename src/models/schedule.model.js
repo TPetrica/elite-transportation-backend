@@ -55,10 +55,10 @@ const dateExceptionSchema = mongoose.Schema(
       type: [timeRangeSchema],
       default: [],
     },
-    // Type of exception: 'closed' or 'custom-hours'
+    // Type of exception: 'closed', 'custom-hours', or 'blocked-hours'
     type: {
       type: String,
-      enum: ['closed', 'custom-hours'],
+      enum: ['closed', 'custom-hours', 'blocked-hours'],
       default: 'closed',
     },
   },

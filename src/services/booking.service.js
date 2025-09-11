@@ -13,6 +13,19 @@ const { convertTo24Hour } = require('../utils/timeFormat');
 const createBooking = async (bookingBody) => {
   try {
     logger.info('Starting booking creation process');
+    console.log('bookingBody', bookingBody)
+    
+    // Debug logging for initial booking data from frontend
+    logger.info('=== FRONTEND BOOKING DATA ===');
+    logger.info('Raw pickup date from frontend:', bookingBody.pickup?.date);
+    logger.info('Raw pickup time from frontend:', bookingBody.pickup?.time);
+    logger.info('Frontend date type:', typeof bookingBody.pickup?.date);
+    logger.info('Frontend time type:', typeof bookingBody.pickup?.time);
+    if (bookingBody.pickup?.date) {
+      logger.info('Frontend date as Date object:', new Date(bookingBody.pickup.date));
+      logger.info('Frontend date ISO:', new Date(bookingBody.pickup.date).toISOString());
+    }
+    logger.info('==============================');
 
     if (bookingBody.extras?.length) {
       const extraIds = bookingBody.extras.map((extra) => extra.item);
@@ -91,6 +104,9 @@ const createBooking = async (bookingBody) => {
     }
 
     try {
+      
+      console.log('booking SERVICE', booking)
+
       const emailData = {
         bookingNumber: booking.bookingNumber,
         amount: booking.payment.amount,
@@ -117,9 +133,11 @@ const createBooking = async (bookingBody) => {
           phone: booking.passengerDetails.phone,
           passengers: booking.passengerDetails.passengers,
           luggage: booking.passengerDetails.luggage,
-          email: booking.passengerDetails.email,
+          email: booking.email, // Use main booking email
           notes: booking.passengerDetails.notes || '',
           specialRequirements: booking.passengerDetails.specialRequirements || '',
+          flightNumber: booking.passengerDetails.flightNumber || booking.pickup.flightNumber || '',
+          company: booking.passengerDetails.company || booking.billingDetails?.company || '',
         },
         billingDetails: {
           firstName: booking.billingDetails.firstName,
@@ -161,6 +179,7 @@ const createBooking = async (bookingBody) => {
       };
 
       // Send email to customer
+      console.log('emailData SERVICE', emailData)
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
       logger.info('Booking confirmation email sent to customer');
       
@@ -523,21 +542,19 @@ const getBookingStats = async (startDate, endDate) => {
       },
     ]);
 
-    // Get upcoming bookings (from today)
+    // Get upcoming bookings (from today) - independent of date filter
     const today = moment().startOf('day');
     const upcomingBookings = await Booking.countDocuments({
       'pickup.date': { $gte: today.toDate() },
       status: { $in: ['pending', 'confirmed'] },
-      ...dateFilter,
     });
 
-    // Get today's bookings
+    // Get today's bookings - independent of date filter
     const todayBookings = await Booking.countDocuments({
       'pickup.date': {
         $gte: today.toDate(),
         $lte: moment().endOf('day').toDate(),
       },
-      ...dateFilter,
     });
 
     // Get total active vehicles count (this would typically come from the vehicle service,

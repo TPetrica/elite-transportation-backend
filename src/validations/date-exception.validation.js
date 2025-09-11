@@ -6,9 +6,9 @@ const createDateException = {
     date: Joi.date().required(),
     isEnabled: Joi.boolean().default(false),
     reason: Joi.string().allow(''),
-    type: Joi.string().valid('closed', 'custom-hours').default('closed'),
+    type: Joi.string().valid('closed', 'custom-hours', 'blocked-hours').default('closed'),
     timeRanges: Joi.when('type', {
-      is: 'custom-hours',
+      is: Joi.valid('custom-hours', 'blocked-hours'),
       then: Joi.array()
         .items(
           Joi.object().keys({
@@ -53,7 +53,7 @@ const updateDateException = {
       date: Joi.date(),
       isEnabled: Joi.boolean(),
       reason: Joi.string().allow(''),
-      type: Joi.string().valid('closed', 'custom-hours'),
+      type: Joi.string().valid('closed', 'custom-hours', 'blocked-hours'),
       timeRanges: Joi.array().items(
         Joi.object().keys({
           start: Joi.string()

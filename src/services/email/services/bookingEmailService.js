@@ -21,8 +21,53 @@ class BookingEmailService extends BaseEmailService {
 
       if (!bookingData) throw new Error('Booking data is required');
 
-      const pickupDate = moment(bookingData.pickup.date).format('MMMM Do YYYY');
-      const pickupTime = moment(bookingData.pickup.time, 'HH:mm').format('h:mm A');
+      // Handle both string and Date object formats
+      let dateObj;
+      const dateInput = bookingData.pickup.date;
+      
+      if (dateInput instanceof Date) {
+        // Already a Date object, use it directly
+        dateObj = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
+      } else if (typeof dateInput === 'string') {
+        // String format like '2025-09-25'
+        const [year, month, day] = dateInput.split('-');
+        dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        throw new Error(`Invalid date format: ${dateInput} (type: ${typeof dateInput})`);
+      }
+      
+      // Helper function for ordinal suffix
+      const getOrdinalSuffix = (day) => {
+        if (day > 3 && day < 21) return 'th';
+        switch (day % 10) {
+          case 1: return 'st';
+          case 2: return 'nd';
+          case 3: return 'rd';
+          default: return 'th';
+        }
+      };
+      
+      const pickupDate = dateObj.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }).replace(/(\d+)/, '$1' + getOrdinalSuffix(dateObj.getDate()));
+
+      // Convert time from 24-hour to 12-hour format if needed
+      const timeInput = bookingData.pickup.time;
+      let pickupTime;
+      
+      if (timeInput.includes('AM') || timeInput.includes('PM')) {
+        // Already in 12-hour format
+        pickupTime = timeInput;
+      } else {
+        // Convert from 24-hour format like '03:30' to '3:30 AM'
+        const [hours, minutes] = timeInput.split(':');
+        const hour = parseInt(hours, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        pickupTime = `${displayHour}:${minutes} ${ampm}`;
+      }
 
       // Generate appropriate template based on service type
       const html = getBookingConfirmationTemplate(bookingData.service, bookingData);

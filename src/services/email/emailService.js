@@ -16,6 +16,7 @@ class EmailService {
 
   // Booking-related emails
   async sendBookingConfirmationEmail(to, bookingData, subjectPrefix = '') {
+    console.log('bookingData', bookingData)
     return this.bookingService.sendBookingConfirmation(to, bookingData, subjectPrefix);
   }
 

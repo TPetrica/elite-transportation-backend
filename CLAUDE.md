@@ -89,7 +89,10 @@ src/
 ├── utils/         # Utility functions
 │   ├── ApiError.js    # Custom error class
 │   ├── catchAsync.js  # Async error wrapper
-│   └── priceCalculator.js # Price calculation logic
+│   ├── priceCalculator.js # Price calculation logic
+│   ├── generateInvoiceNumber.js # Invoice number generation
+│   ├── pick.js        # Object property picker
+│   └── sendSMS.js     # Twilio SMS integration
 ├── validations/   # Joi validation schemas
 ├── app.js         # Express app setup
 └── index.js       # Server entry point
@@ -106,10 +109,11 @@ src/
 7. **Logging**: Winston (app logs) + Morgan (HTTP logs)
 8. **Email Service**: Modular architecture with Handlebars templates
 9. **Payment**: Stripe integration with webhook support
-10. **SMS**: Twilio integration
-11. **Security**: Helmet, CORS, XSS protection, rate limiting
-12. **Testing**: Jest for unit and integration tests
-13. **Code Quality**: ESLint (Airbnb config) + Prettier
+10. **SMS**: Twilio integration for booking confirmations
+11. **Calendar**: Google Calendar API for availability management
+12. **Security**: Helmet, CORS, XSS protection, rate limiting
+13. **Testing**: Jest for unit and integration tests
+14. **Code Quality**: ESLint (Airbnb config) + Prettier
 
 ## API Endpoints Structure
 
@@ -210,8 +214,13 @@ Key environment variables (see .env.example for full list):
 - `JWT_REFRESH_EXPIRATION_DAYS` - Refresh token expiry (default: 30)
 - `STRIPE_SECRET_KEY` - Stripe API key
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
-- `TWILIO_*` - Twilio SMS configuration
+- `TWILIO_ACCOUNT_SID` - Twilio account identifier
+- `TWILIO_AUTH_TOKEN` - Twilio authentication token
+- `TWILIO_PHONE_NUMBER` - Twilio phone number for SMS
+- `GOOGLE_SERVICE_ACCOUNT_KEY` - Google Calendar service account
 - `SMTP_*` - Email service configuration
+- `CLIENT_URL` - Frontend application URL
+- `SUPPORT_PHONE` - Support phone number
 
 ## Common Development Tasks
 
@@ -233,6 +242,24 @@ The affiliate system allows partners to offer custom pricing:
 2. **Validation**: `affiliate.validation.js` validates pricing configurations
 3. **API**: `POST /v1/affiliates/validate` validates affiliate codes
 4. **Pricing**: Custom pricing stored per service type with base price and min passengers
+
+### Working with Round-Trip Bookings
+
+The booking system supports round-trip functionality:
+
+1. **Model**: `booking.model.js` includes `roundTrip` flag and return trip details
+2. **Validation**: Separate validation for outbound and return trip data
+3. **Pricing**: Round-trip pricing calculated with potential discounts
+4. **Email**: Confirmation emails include both trip details
+
+### Working with Payment System
+
+Stripe integration with webhook support:
+
+1. **Service**: `payment.service.js` handles Stripe operations
+2. **Webhooks**: `/v1/payment/webhook` endpoint processes Stripe events
+3. **Security**: Webhook signature verification for security
+4. **Models**: Payment records linked to bookings for audit trail
 
 ### Database Operations
 
