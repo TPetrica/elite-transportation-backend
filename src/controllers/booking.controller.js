@@ -109,41 +109,8 @@ const getBookingByNumber = catchAsync(async (req, res) => {
  */
 const updateBooking = catchAsync(async (req, res) => {
   try {
-    // Check what fields are being updated
-    const updateData = req.body;
-    const isDateTimeUpdate = updateData.pickup?.date || updateData.pickup?.time;
-
-    // Update the booking
-    const booking = await bookingService.updateBookingById(req.params.bookingId, updateData);
-
-    // If date or time has been updated, send email notification
-    if (isDateTimeUpdate) {
-      const updatedFields = {
-        pickup: {},
-      };
-
-      if (updateData.pickup?.date) {
-        updatedFields.pickup.date = updateData.pickup.date;
-      }
-
-      if (updateData.pickup?.time) {
-        updatedFields.pickup.time = updateData.pickup.time;
-      }
-
-      try {
-        await emailService.sendBookingUpdateEmail(
-          booking.email,
-          booking.bookingNumber,
-          booking.passengerDetails,
-          updatedFields
-        );
-        logger.info(`Booking update email sent to ${booking.email}`);
-      } catch (emailError) {
-        logger.error('Failed to send booking update email:', emailError);
-        // Continue with the response even if email fails
-      }
-    }
-
+    // Update the booking - email sending is handled in the service layer
+    const booking = await bookingService.updateBookingById(req.params.bookingId, req.body);
     res.send(booking);
   } catch (error) {
     logger.error('Error in updateBooking controller:', error);

@@ -423,17 +423,16 @@ const updateBookingById = async (bookingId, updateBody) => {
     Object.assign(booking, updateBody);
     await booking.save();
 
-    // Send update email if date/time was changed
+    // Send update email if date/time was changed (non-blocking)
     if (isDateTimeChange) {
-      try {
-        await emailService.sendBookingUpdateEmail(booking.email, booking.bookingNumber, booking.passengerDetails, {
-          pickup: updatedDateTime,
-        });
+      // Don't await - send email in background to avoid blocking the HTTP response
+      emailService.sendBookingUpdateEmail(booking.email, booking.bookingNumber, booking.passengerDetails, {
+        pickup: updatedDateTime,
+      }).then(() => {
         logger.info(`Booking update email sent to ${booking.email} for booking ${booking.bookingNumber}`);
-      } catch (error) {
+      }).catch((error) => {
         logger.error('Failed to send update email:', error);
-        // Continue with the booking update even if the email fails
-      }
+      });
     }
 
     return booking;
