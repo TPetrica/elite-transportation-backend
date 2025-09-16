@@ -127,7 +127,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       });
     }
     
-    // Create Stripe Session
+    // Create Stripe Session with automatic invoice creation
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
@@ -135,6 +135,34 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       mode: 'payment',
       success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
+      // Enable automatic invoice creation
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: `Transportation Service - ${bookingData.service}`,
+          metadata: {
+            service: bookingData.service,
+            pickupDate: bookingData.pickup?.date || '',
+            pickupTime: bookingData.pickup?.time || '',
+            pickupAddress: bookingData.pickup?.address || '',
+            dropoffAddress: bookingData.dropoff?.address || '',
+            passengerName: `${bookingData.passengerDetails?.firstName || ''} ${bookingData.passengerDetails?.lastName || ''}`.trim(),
+            passengerPhone: bookingData.passengerDetails?.phone || '',
+            passengerEmail: bookingData.passengerDetails?.email || bookingData.email || '',
+            passengers: bookingData.passengerDetails?.passengers || '',
+            luggage: bookingData.passengerDetails?.luggage || '',
+            flightNumber: bookingData.pickup?.flightNumber || bookingData.passengerDetails?.flightNumber || '',
+            flightTime: bookingData.pickup?.flightTime || bookingData.passengerDetails?.flightTime || '',
+            distance: bookingData.distance ? `${bookingData.distance.miles || 0} miles / ${bookingData.distance.km || 0} km` : '',
+            duration: bookingData.duration || '',
+            isRoundTrip: bookingData.isRoundTrip ? 'true' : 'false',
+            affiliate: bookingData.affiliate ? 'true' : 'false',
+            affiliateCode: bookingData.affiliateCode || '',
+            notes: bookingData.passengerDetails?.notes || '',
+            specialRequirements: bookingData.passengerDetails?.specialRequirements || '',
+          },
+        },
+      },
       payment_intent_data: {
         metadata: {
           paymentId: tempPayment._id.toString(),
@@ -270,35 +298,37 @@ const handleWebhook = async (req, res) => {
             booking = null;
           }
 
-          // Create invoice for the completed booking (if booking was created)
-          let invoiceId = null;
-          if (booking) {
+          // Get the automatically created invoice from the session
+          let invoiceId = session.invoice;
+          
+          // Update invoice metadata with booking number if invoice exists and booking was created
+          if (invoiceId && booking) {
             try {
-              const invoice = await paymentService.createInvoice(
-                session.customer,
-                { 
-                  ...bookingData, 
-                  bookingNumber: booking.bookingNumber 
+              await stripe.invoices.update(invoiceId, {
+                metadata: {
+                  // Keep existing metadata and add booking number
+                  ...session.invoice_creation?.invoice_data?.metadata,
+                  bookingNumber: booking.bookingNumber,
                 },
-                session.amount_total / 100
-              );
-              invoiceId = invoice.id;
+              });
               
-              logger.info('Invoice created for booking:', {
+              logger.info('Invoice updated with booking number:', {
                 bookingId: booking._id,
-                invoiceId: invoice.id,
-                invoiceUrl: invoice.hosted_invoice_url,
+                invoiceId: invoiceId,
+                bookingNumber: booking.bookingNumber,
               });
-            } catch (invoiceError) {
-              logger.error('Invoice creation failed for booking:', {
-                error: invoiceError.message,
+            } catch (invoiceUpdateError) {
+              logger.error('Failed to update invoice with booking number:', {
+                error: invoiceUpdateError.message,
+                invoiceId: invoiceId,
                 bookingId: booking._id,
-                sessionId: session.id,
               });
-              // Continue - don't let invoice failure stop the workflow
+              // Continue - don't let invoice update failure stop the workflow
             }
+          }
 
-            // Update payment record with booking reference and invoice ID
+          // Update payment record with booking reference and invoice ID
+          if (booking) {
             try {
               await Payment.findByIdAndUpdate(payment._id, {
                 status: 'completed',
@@ -315,7 +345,7 @@ const handleWebhook = async (req, res) => {
             }
           } else {
             // No booking created, just update payment status
-            logger.info('Skipping invoice creation - no booking was created');
+            logger.info('Skipping invoice update - no booking was created');
           }
 
           // Create tax transaction if tax calculation exists
@@ -358,9 +388,12 @@ const handleWebhook = async (req, res) => {
 
           // Send notifications (continue even if some fail)
           try {
-            // Send invoice email
-            await emailService.sendInvoiceEmail(session.customer_details.email, session.payment_intent, session, booking);
-            logger.info('Invoice email sent successfully');
+            // Send invoice email with the automatically created invoice
+            await emailService.sendInvoiceEmail(session.customer_details.email, session.payment_intent, session, booking, invoiceId);
+            logger.info('Invoice email sent successfully:', {
+              email: session.customer_details.email,
+              invoiceId: invoiceId,
+            });
           } catch (emailError) {
             logger.error('Invoice email failed but continuing workflow:', {
               error: emailError.message,
