@@ -22,6 +22,9 @@ const paymentSchema = mongoose.Schema(
     stripePaymentId: {
       type: String,
     },
+    stripeInvoiceId: {
+      type: String,
+    },
     method: {
       type: String,
       enum: ['card', 'paypal'],

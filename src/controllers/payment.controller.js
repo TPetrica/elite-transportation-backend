@@ -232,30 +232,91 @@ const handleWebhook = async (req, res) => {
           logger.info('==================================');
 
           // Create the booking now that payment is completed
-          const booking = await bookingService.createBooking({
-            ...bookingData,
-            payment: {
-              method: 'credit_card',
-              amount: session.amount_total / 100,
+          let booking;
+          try {
+            booking = await bookingService.createBooking({
+              ...bookingData,
+              payment: {
+                method: 'credit_card',
+                amount: session.amount_total / 100,
+                status: 'completed',
+                stripeSessionId: session.id,
+                stripeCustomerId: session.customer,
+                stripePaymentIntentId: session.payment_intent,
+              },
+            });
+
+            logger.info('Booking created after successful payment:', {
+              bookingId: booking._id,
+              bookingNumber: booking.bookingNumber,
+            });
+          } catch (bookingError) {
+            logger.error('Booking creation failed, but payment succeeded:', {
+              error: bookingError.message,
+              stack: bookingError.stack,
+              sessionId: session.id,
+              paymentId: payment._id,
+            });
+            
+            // Update payment as completed even if booking failed
+            await Payment.findByIdAndUpdate(payment._id, {
               status: 'completed',
-              stripeSessionId: session.id,
-              stripeCustomerId: session.customer,
               stripePaymentIntentId: session.payment_intent,
-            },
-          });
+              'metadata.bookingCreationFailed': true,
+              'metadata.bookingError': bookingError.message,
+            });
+            
+            // Continue workflow - don't throw error
+            booking = null;
+          }
 
-          logger.info('Booking created after successful payment:', {
-            bookingId: booking._id,
-            bookingNumber: booking.bookingNumber,
-          });
+          // Create invoice for the completed booking (if booking was created)
+          let invoiceId = null;
+          if (booking) {
+            try {
+              const invoice = await paymentService.createInvoice(
+                session.customer,
+                { 
+                  ...bookingData, 
+                  bookingNumber: booking.bookingNumber 
+                },
+                session.amount_total / 100
+              );
+              invoiceId = invoice.id;
+              
+              logger.info('Invoice created for booking:', {
+                bookingId: booking._id,
+                invoiceId: invoice.id,
+                invoiceUrl: invoice.hosted_invoice_url,
+              });
+            } catch (invoiceError) {
+              logger.error('Invoice creation failed for booking:', {
+                error: invoiceError.message,
+                bookingId: booking._id,
+                sessionId: session.id,
+              });
+              // Continue - don't let invoice failure stop the workflow
+            }
 
-          // Update payment record with booking reference
-          await Payment.findByIdAndUpdate(payment._id, {
-            status: 'completed',
-            booking: booking._id,
-            'metadata.bookingNumber': booking.bookingNumber,
-            stripePaymentIntentId: session.payment_intent,
-          });
+            // Update payment record with booking reference and invoice ID
+            try {
+              await Payment.findByIdAndUpdate(payment._id, {
+                status: 'completed',
+                booking: booking._id,
+                'metadata.bookingNumber': booking.bookingNumber,
+                stripePaymentIntentId: session.payment_intent,
+                stripeInvoiceId: invoiceId,
+              });
+            } catch (updateError) {
+              logger.error('Payment update failed but continuing workflow:', {
+                error: updateError.message,
+                paymentId: payment._id,
+              });
+            }
+          } else {
+            // No booking created, just update payment status
+            logger.info('Skipping invoice creation - no booking was created');
+          }
 
           // Create tax transaction if tax calculation exists
           if (session.metadata.taxCalculationId) {
@@ -280,27 +341,46 @@ const handleWebhook = async (req, res) => {
             }
           }
 
-          // Create calendar event
-          await calendarService.createEvent(booking);
+          // Create calendar event (only if booking was created)
+          if (booking) {
+            try {
+              await calendarService.createEvent(booking);
+              logger.info('Calendar event created successfully:', {
+                bookingId: booking._id,
+              });
+            } catch (calendarError) {
+              logger.error('Calendar event creation failed but continuing workflow:', {
+                error: calendarError.message,
+                bookingId: booking._id,
+              });
+            }
+          }
 
-          // Send notifications
+          // Send notifications (continue even if some fail)
           try {
             // Send invoice email
             await emailService.sendInvoiceEmail(session.customer_details.email, session.payment_intent, session, booking);
+            logger.info('Invoice email sent successfully');
+          } catch (emailError) {
+            logger.error('Invoice email failed but continuing workflow:', {
+              error: emailError.message,
+              email: session.customer_details.email,
+            });
+          }
 
-            // Send SMS if phone number exists
-            if (booking.passengerDetails?.phone) {
+          // Send SMS if phone number exists and booking was created
+          if (booking?.passengerDetails?.phone) {
+            try {
               await smsService.sendBookingConfirmation(booking, {
                 amount: session.amount_total / 100,
               });
+              logger.info('SMS confirmation sent successfully');
+            } catch (smsError) {
+              logger.error('SMS confirmation failed but continuing workflow:', {
+                error: smsError.message,
+                phone: booking.passengerDetails.phone,
+              });
             }
-          } catch (notificationError) {
-            // Log but don't fail the webhook
-            logger.error('Notification sending failed:', {
-              error: notificationError.message,
-              bookingId: booking._id,
-              sessionId: session.id,
-            });
           }
         } catch (error) {
           logger.error('Failed to process successful payment:', {

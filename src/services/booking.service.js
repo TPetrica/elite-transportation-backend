@@ -15,6 +15,25 @@ const createBooking = async (bookingBody) => {
     logger.info('Starting booking creation process');
     console.log('bookingBody', bookingBody)
     
+    // Sanitize fields that might come as empty strings from frontend
+    if (bookingBody.duration === '') {
+      delete bookingBody.duration;
+    }
+    
+    // Handle distance fields
+    if (bookingBody.distance) {
+      if (bookingBody.distance.km === '' || bookingBody.distance.km === 0) {
+        delete bookingBody.distance.km;
+      }
+      if (bookingBody.distance.miles === '' || bookingBody.distance.miles === 0) {
+        delete bookingBody.distance.miles;
+      }
+      // If distance object is now empty, remove it entirely
+      if (Object.keys(bookingBody.distance).length === 0) {
+        delete bookingBody.distance;
+      }
+    }
+    
     // Debug logging for initial booking data from frontend
     logger.info('=== FRONTEND BOOKING DATA ===');
     logger.info('Raw pickup date from frontend:', bookingBody.pickup?.date);

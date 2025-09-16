@@ -58,7 +58,7 @@ const getFromAirportInstructions = () => `
     <div class="step-icon">📩</div>
     <div class="step-content">
       <div class="step-title">Kindly notify us once you are outside</div>
-      <p>We will proceed to the designated pick-up area. We will be arriving in a black Ford Expedition marked with Elite Transportation on the side.</p>
+      <p>We will proceed to the designated pick-up area. We will be arriving in a black Chevrolet Suburban marked with Elite Transportation on the side.</p>
     </div>
   </div>
   

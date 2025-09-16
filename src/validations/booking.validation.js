@@ -39,11 +39,11 @@ const createBooking = {
       .required(),
     distance: Joi.object()
       .keys({
-        km: Joi.number().required(),
-        miles: Joi.number().required(),
+        km: Joi.number().optional(),
+        miles: Joi.number().optional(),
       })
-      .required(),
-    duration: Joi.string().required(),
+      .optional(),
+    duration: Joi.string().allow('').optional(),
     service: Joi.string()
       .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
       .required(),
