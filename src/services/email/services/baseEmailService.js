@@ -24,7 +24,7 @@ class BaseEmailService {
     ) {
       const transport = nodemailer.createTransport(config.email.smtp);
 
-      logger.log('Email: ', config.email.smtp)
+      logger.info('SMTP Config:', config.email.smtp);
       transport
         .verify()
         .then(() => logger.info('Connected to email server'))
