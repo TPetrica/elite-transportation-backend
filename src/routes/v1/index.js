@@ -76,4 +76,52 @@ if (config.env === 'development') {
 
 router.get('/status', (req, res) => res.send('OK'));
 
+// Test email endpoint (for debugging SMTP issues)
+router.post('/test-email', async (req, res) => {
+  try {
+    const emailService = require('../../services/email/emailService');
+    const testEmail = req.body.email || 'elitetransportationpc@gmail.com';
+    
+    const testBookingData = {
+      bookingNumber: 'TEST-' + Date.now(),
+      service: 'from-airport',
+      pickup: {
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00',
+        address: 'Salt Lake City International Airport'
+      },
+      dropoff: {
+        address: 'Park City, UT'
+      },
+      passengerDetails: {
+        firstName: 'Test',
+        lastName: 'User',
+        phone: '555-0123',
+        passengers: 1
+      },
+      pricing: {
+        totalPrice: 100
+      }
+    };
+    
+    await emailService.sendBookingConfirmationEmail(testEmail, testBookingData);
+    
+    res.json({
+      success: true,
+      message: `Test email sent to ${testEmail}`,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      smtpHost: process.env.SMTP_HOST
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      smtpHost: process.env.SMTP_HOST
+    });
+  }
+});
+
 module.exports = router;
