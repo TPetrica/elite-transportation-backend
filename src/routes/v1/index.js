@@ -76,6 +76,18 @@ if (config.env === 'development') {
 
 router.get('/status', (req, res) => res.send('OK'));
 
+// Check environment variables endpoint
+router.get('/env-check', (req, res) => {
+  res.json({
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_USERNAME: process.env.SMTP_USERNAME,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    NODE_ENV: process.env.NODE_ENV,
+    hasPassword: !!process.env.SMTP_PASSWORD
+  });
+});
+
 // Test email endpoint (for debugging SMTP issues)
 router.post('/test-email', async (req, res) => {
   try {
