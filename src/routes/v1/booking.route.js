@@ -33,6 +33,14 @@ router.post(
   bookingController.sendReminderEmail
 );
 
+// Resend booking emails (confirmation + invoice)
+router.post(
+  '/:bookingId/resend-emails',
+  auth('manageBookings'),
+  validate(bookingValidation.getBooking),
+  bookingController.resendBookingEmails
+);
+
 // Attach user to booking
 router.post(
   '/attach/:bookingNumber',

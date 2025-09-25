@@ -8,7 +8,7 @@ module.exports.bookingService = require('./booking.service');
 module.exports.calendarService = require('./calendar.service');
 module.exports.paymentService = require('./payment.service');
 module.exports.availabilityService = require('./availability.service');
-module.exports.smsService = require('./sms.service');
+// SMS service removed
 module.exports.blogService = require('./blog.service');
 module.exports.affiliateService = require('./affiliate.service');
 module.exports.manualBookingService = require('./manualBooking.service');

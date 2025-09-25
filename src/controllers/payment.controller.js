@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { paymentService, bookingService, smsService, calendarService } = require('../services');
+const { paymentService, bookingService, calendarService } = require('../services');
 const emailService = require('../services/email/emailService');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const logger = require('../config/logger');
@@ -401,20 +401,7 @@ const handleWebhook = async (req, res) => {
             });
           }
 
-          // Send SMS if phone number exists and booking was created
-          if (booking?.passengerDetails?.phone) {
-            try {
-              await smsService.sendBookingConfirmation(booking, {
-                amount: session.amount_total / 100,
-              });
-              logger.info('SMS confirmation sent successfully');
-            } catch (smsError) {
-              logger.error('SMS confirmation failed but continuing workflow:', {
-                error: smsError.message,
-                phone: booking.passengerDetails.phone,
-              });
-            }
-          }
+          // SMS functionality removed
         } catch (error) {
           logger.error('Failed to process successful payment:', {
             error: error.message,
@@ -442,13 +429,7 @@ const handleWebhook = async (req, res) => {
         try {
           const failedPayment = await paymentService.handleFailedPayment(failedIntent);
 
-          // Send SMS for failed payment if we have the phone number
-          if (failedPayment?.metadata?.bookingData) {
-            const bookingData = JSON.parse(failedPayment.metadata.bookingData);
-            if (bookingData.passengerDetails?.phone) {
-              await smsService.sendPaymentFailedNotification(bookingData, failedIntent.last_payment_error);
-            }
-          }
+          // SMS functionality removed
         } catch (error) {
           logger.error('Failed to handle payment failure:', {
             error: error.message,

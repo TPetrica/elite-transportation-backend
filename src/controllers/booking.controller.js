@@ -211,6 +211,124 @@ const sendReminderEmail = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: 'Reminder email sent successfully' });
 });
 
+const resendBookingEmails = catchAsync(async (req, res) => {
+  const booking = await bookingService.getBookingById(req.params.bookingId);
+  
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+  }
+
+  logger.info('Resending emails for booking:', {
+    bookingId: booking._id,
+    bookingNumber: booking.bookingNumber,
+    customerEmail: booking.email
+  });
+
+  // Prepare email data
+  const emailData = {
+    bookingNumber: booking.bookingNumber,
+    amount: booking.payment?.amount || booking.pricing?.totalPrice,
+    pickup: booking.pickup,
+    dropoff: booking.dropoff,
+    distance: booking.distance,
+    duration: booking.duration,
+    service: booking.service,
+    passengerDetails: booking.passengerDetails,
+    billingDetails: booking.billingDetails,
+    payment: booking.payment,
+    pricing: booking.pricing,
+    extras: booking.extras || [],
+    affiliate: booking.affiliate,
+    affiliateCode: booking.affiliateCode,
+    returnDetails: booking.returnDetails,
+    tripType: booking.tripType,
+    isRoundTrip: booking.isRoundTrip
+  };
+
+  const results = {
+    customer: { sent: false, error: null },
+    admin: { sent: false, error: null },
+    affiliate: { sent: false, error: null },
+    invoice: { sent: false, error: null }
+  };
+
+  // Send to customer
+  const customerEmail = booking.email || booking.passengerDetails?.email;
+  if (customerEmail) {
+    try {
+      await emailService.sendBookingConfirmationEmail(customerEmail, emailData);
+      results.customer.sent = true;
+      logger.info('Customer confirmation email resent successfully');
+    } catch (error) {
+      results.customer.error = error.message;
+      logger.error('Failed to resend customer email:', error);
+    }
+  }
+
+  // Send to admin
+  const config = require('../config/config');
+  if (config.email.adminEmail) {
+    try {
+      await emailService.sendBookingConfirmationEmail(config.email.adminEmail, emailData);
+      results.admin.sent = true;
+      logger.info('Admin confirmation email resent successfully');
+    } catch (error) {
+      results.admin.error = error.message;
+      logger.error('Failed to resend admin email:', error);
+    }
+  }
+
+  // Send to affiliate if applicable
+  if (booking.affiliateCode) {
+    try {
+      const { affiliateService } = require('../services');
+      const affiliate = await affiliateService.getAffiliateByCode(booking.affiliateCode);
+      
+      if (affiliate && affiliate.sendNotificationEmails && affiliate.companyEmail) {
+        await emailService.sendBookingConfirmationEmail(
+          affiliate.companyEmail, 
+          emailData, 
+          `[Affiliate: ${affiliate.name}] `
+        );
+        results.affiliate.sent = true;
+        logger.info('Affiliate confirmation email resent successfully');
+      }
+    } catch (error) {
+      results.affiliate.error = error.message;
+      logger.error('Failed to resend affiliate email:', error);
+    }
+  }
+
+  // Send invoice email if we have Stripe session data
+  if (booking.payment?.stripeSessionId) {
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      const session = await stripe.checkout.sessions.retrieve(booking.payment.stripeSessionId, {
+        expand: ['customer', 'payment_intent']
+      });
+      
+      await emailService.sendInvoiceEmail(
+        customerEmail, 
+        booking.payment.stripePaymentIntentId, 
+        session, 
+        booking,
+        session.invoice
+      );
+      results.invoice.sent = true;
+      logger.info('Invoice email resent successfully');
+    } catch (error) {
+      results.invoice.error = error.message;
+      logger.error('Failed to resend invoice email:', error);
+    }
+  }
+
+  res.status(httpStatus.OK).json({
+    message: 'Email resend process completed',
+    bookingNumber: booking.bookingNumber,
+    results: results
+  });
+});
+
 module.exports = {
   createBooking,
   getBookings,
@@ -222,4 +340,5 @@ module.exports = {
   getUserBookings,
   getBookingStats,
   sendReminderEmail,
+  resendBookingEmails,
 };
