@@ -155,6 +155,9 @@ const bookingSchema = mongoose.Schema(
       stripePaymentIntentId: {
         type: String,
       },
+      stripeSessionId: {
+        type: String,
+      },
     },
     // Billing Details
     billingDetails: {

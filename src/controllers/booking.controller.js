@@ -28,7 +28,10 @@ const createBooking = catchAsync(async (req, res) => {
       distance: booking.distance,
       duration: booking.duration,
       service: booking.service,
-      passengerDetails: booking.passengerDetails,
+      passengerDetails: {
+        ...booking.passengerDetails,
+        email: booking.email // Add email to passengerDetails for template compatibility
+      },
       billingDetails: booking.billingDetails,
       payment: booking.payment,
       extras: booking.extras || [],
@@ -218,10 +221,11 @@ const resendBookingEmails = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
   }
 
-  logger.info('Resending emails for booking:', {
+  const customerEmail = booking.email || booking.passengerDetails?.email;
+  logger.info('Resending booking confirmation emails for:', {
     bookingId: booking._id,
     bookingNumber: booking.bookingNumber,
-    customerEmail: booking.email
+    customerEmail: customerEmail
   });
 
   // Prepare email data
@@ -233,7 +237,10 @@ const resendBookingEmails = catchAsync(async (req, res) => {
     distance: booking.distance,
     duration: booking.duration,
     service: booking.service,
-    passengerDetails: booking.passengerDetails,
+    passengerDetails: {
+      ...booking.passengerDetails,
+      email: customerEmail // Add email to passengerDetails for template compatibility
+    },
     billingDetails: booking.billingDetails,
     payment: booking.payment,
     pricing: booking.pricing,
@@ -248,85 +255,498 @@ const resendBookingEmails = catchAsync(async (req, res) => {
   const results = {
     customer: { sent: false, error: null },
     admin: { sent: false, error: null },
-    affiliate: { sent: false, error: null },
-    invoice: { sent: false, error: null }
+    affiliate: { sent: false, error: null }
   };
 
-  // Send to customer
-  const customerEmail = booking.email || booking.passengerDetails?.email;
+  // Send email asynchronously (don't wait for completion)
   if (customerEmail) {
-    try {
-      await emailService.sendBookingConfirmationEmail(customerEmail, emailData);
-      results.customer.sent = true;
-      logger.info('Customer confirmation email resent successfully');
-    } catch (error) {
-      results.customer.error = error.message;
-      logger.error('Failed to resend customer email:', error);
-    }
-  }
-
-  // Send to admin
-  const config = require('../config/config');
-  if (config.email.adminEmail) {
-    try {
-      await emailService.sendBookingConfirmationEmail(config.email.adminEmail, emailData);
-      results.admin.sent = true;
-      logger.info('Admin confirmation email resent successfully');
-    } catch (error) {
-      results.admin.error = error.message;
-      logger.error('Failed to resend admin email:', error);
-    }
-  }
-
-  // Send to affiliate if applicable
-  if (booking.affiliateCode) {
-    try {
-      const { affiliateService } = require('../services');
-      const affiliate = await affiliateService.getAffiliateByCode(booking.affiliateCode);
-      
-      if (affiliate && affiliate.sendNotificationEmails && affiliate.companyEmail) {
-        await emailService.sendBookingConfirmationEmail(
-          affiliate.companyEmail, 
-          emailData, 
-          `[Affiliate: ${affiliate.name}] `
-        );
-        results.affiliate.sent = true;
-        logger.info('Affiliate confirmation email resent successfully');
-      }
-    } catch (error) {
-      results.affiliate.error = error.message;
-      logger.error('Failed to resend affiliate email:', error);
-    }
-  }
-
-  // Send invoice email if we have Stripe session data
-  if (booking.payment?.stripeSessionId) {
-    try {
-      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-      const session = await stripe.checkout.sessions.retrieve(booking.payment.stripeSessionId, {
-        expand: ['customer', 'payment_intent']
+    // Send email in background - don't await
+    emailService.sendBookingConfirmationEmail(customerEmail, emailData)
+      .then(() => {
+        logger.info('Customer confirmation email resent successfully');
+      })
+      .catch(error => {
+        logger.error('Failed to resend customer email:', error);
       });
-      
-      await emailService.sendInvoiceEmail(
-        customerEmail, 
-        booking.payment.stripePaymentIntentId, 
-        session, 
-        booking,
-        session.invoice
-      );
-      results.invoice.sent = true;
-      logger.info('Invoice email resent successfully');
-    } catch (error) {
-      results.invoice.error = error.message;
-      logger.error('Failed to resend invoice email:', error);
-    }
+    
+    results.customer.sent = true; // Optimistically mark as sent
+  } else {
+    results.customer.error = 'No customer email found';
   }
 
+  // Return response immediately
   res.status(httpStatus.OK).json({
-    message: 'Email resend process completed',
+    message: 'Booking confirmation email resend initiated',
     bookingNumber: booking.bookingNumber,
+    customerEmail: customerEmail,
     results: results
   });
+});
+
+const resendInvoiceEmail = catchAsync(async (req, res) => {
+  const booking = await bookingService.getBookingById(req.params.bookingId);
+  
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+  }
+
+  const customerEmail = booking.email || booking.passengerDetails?.email;
+  
+  if (!customerEmail) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No customer email found for this booking');
+  }
+
+  if (!booking.payment?.stripeSessionId && !booking.payment?.stripePaymentIntentId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No Stripe payment information found for this booking');
+  }
+
+  logger.info('Resending invoice email for booking:', {
+    bookingId: booking._id,
+    bookingNumber: booking.bookingNumber,
+    customerEmail: customerEmail,
+    hasStripeSessionId: !!booking.payment?.stripeSessionId,
+    hasStripePaymentIntentId: !!booking.payment?.stripePaymentIntentId,
+    stripeSessionId: booking.payment?.stripeSessionId,
+    stripePaymentIntentId: booking.payment?.stripePaymentIntentId,
+    paymentMethod: booking.payment?.method,
+    paymentStatus: booking.payment?.status
+  });
+
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    
+    let session = null;
+    let invoiceId = null;
+    
+    // Try to get session if we have session ID
+    if (booking.payment.stripeSessionId) {
+      try {
+        session = await stripe.checkout.sessions.retrieve(booking.payment.stripeSessionId, {
+          expand: ['customer', 'payment_intent']
+        });
+        invoiceId = session.invoice;
+      } catch (sessionError) {
+        logger.warn('Could not retrieve Stripe session, continuing with payment intent only:', sessionError.message);
+      }
+    }
+    
+    // If no session or session retrieval failed, create minimal session-like object
+    if (!session && booking.payment.stripePaymentIntentId) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(booking.payment.stripePaymentIntentId);
+        session = {
+          id: booking.payment.stripeSessionId || `session_${booking.payment.stripePaymentIntentId}`,
+          payment_intent: paymentIntent,
+          customer_details: {
+            email: customerEmail,
+            name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`
+          },
+          amount_total: booking.payment.amount * 100, // Convert to cents
+          currency: booking.payment.currency || 'usd'
+        };
+      } catch (paymentIntentError) {
+        logger.error('Could not retrieve payment intent:', paymentIntentError.message);
+        logger.info('Creating fallback session object for booking without Stripe data');
+        
+        // Create minimal session for bookings that can't access Stripe (e.g., test bookings, manual bookings)
+        session = {
+          id: `fallback_${booking._id}`,
+          payment_intent: {
+            id: booking.payment.stripePaymentIntentId || `pi_fallback_${booking._id}`,
+            status: 'succeeded',
+            amount: booking.payment.amount * 100,
+            currency: booking.payment.currency || 'usd'
+          },
+          customer_details: {
+            email: customerEmail,
+            name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`
+          },
+          amount_total: booking.payment.amount * 100,
+          currency: booking.payment.currency || 'usd'
+        };
+      }
+    }
+    
+    // Send invoice email asynchronously (don't wait for completion)
+    emailService.sendInvoiceEmail(
+      customerEmail, 
+      booking.payment.stripePaymentIntentId, 
+      session, 
+      booking,
+      invoiceId
+    ).then(() => {
+      logger.info('Invoice email resent successfully');
+    }).catch(error => {
+      logger.error('Failed to resend invoice email:', error);
+    });
+    
+    // Return response immediately
+    res.status(httpStatus.OK).json({
+      message: 'Invoice email resend initiated',
+      bookingNumber: booking.bookingNumber,
+      customerEmail: customerEmail
+    });
+  } catch (error) {
+    logger.error('Failed to resend invoice email:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to resend invoice: ${error.message}`);
+  }
+});
+
+/**
+ * View the email invoice template (same as sent via email)
+ * @route GET /v1/bookings/:bookingId/email-invoice
+ */
+const viewEmailInvoice = catchAsync(async (req, res) => {
+  const booking = await bookingService.getBookingById(req.params.bookingId);
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+  }
+
+  const customerEmail = booking.email || booking.passengerDetails?.email;
+  if (!customerEmail) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No customer email found for this booking');
+  }
+
+  if (!booking.payment?.stripePaymentIntentId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No payment information found for this booking');
+  }
+
+  try {
+    const invoiceTemplate = require('../services/email/templates/invoiceTemplate');
+    const config = require('../config/config');
+
+    // Create the same session-like object used in resendInvoiceEmail
+    const session = {
+      id: booking.payment.stripeSessionId || `session_${booking.payment.stripePaymentIntentId}`,
+      amount_total: booking.payment.amount * 100, // Convert to cents
+      currency: booking.payment.currency || 'usd'
+    };
+
+    const amount = session.amount_total / 100;
+    
+    // Build products array with base service (same logic as invoiceEmailService.js)
+    const products = [];
+    
+    // Add base service with detailed description
+    const basePrice = booking.pricing?.basePrice || amount;
+    
+    // For round trips, split the base price
+    if (booking.isRoundTrip) {
+      const singleTripPrice = basePrice / 2;
+      
+      // Outbound trip
+      products.push({
+        name: `Transportation ${booking.pickup.address.includes('Airport') ? 'from Airport to ' + booking.dropoff.address : 'to ' + booking.dropoff.address}`,
+        description: `${booking.pickup.address} → ${booking.dropoff.address}`,
+        price: singleTripPrice,
+        quantity: 1,
+      });
+      
+      // Return trip
+      if (booking.returnDetails) {
+        products.push({
+          name: `Transportation ${booking.returnDetails.dropoffAddress.includes('Airport') ? 'to Airport' : 'from ' + booking.returnDetails.pickupAddress} (Return)`,
+          description: `${booking.returnDetails.pickupAddress} → ${booking.returnDetails.dropoffAddress}`,
+          price: singleTripPrice,
+          quantity: 1,
+        });
+      }
+    } else {
+      // One-way trip
+      products.push({
+        name: `Transportation ${booking.service === 'from-airport' ? 'from Airport' : booking.service === 'to-airport' ? 'to Airport' : ''}`,
+        description: `${booking.pickup.address} → ${booking.dropoff.address}`,
+        price: basePrice,
+        quantity: 1,
+      });
+    }
+    
+    // Add extras with their actual names
+    if (booking.extras && booking.extras.length > 0) {
+      // Populate extras if needed
+      const populatedExtras = booking.extras.map(extra => {
+        if (extra.item && extra.item.name) {
+          return { ...extra, name: extra.item.name };
+        }
+        return extra;
+      });
+      
+      populatedExtras.forEach(extra => {
+        if (extra.price > 0) {
+          products.push({
+            name: extra.name || 'Extra Service',
+            price: extra.price,
+            quantity: extra.quantity || 1,
+          });
+        }
+      });
+    }
+    
+    // Add night fee if applicable
+    if (booking.pricing?.nightFee > 0) {
+      const nightFeePerTrip = 20; // Night fee is $20 per trip
+      const nightFeeCount = booking.pricing.nightFee / nightFeePerTrip;
+      
+      if (nightFeeCount === 1) {
+        products.push({
+          name: 'Night Service Fee',
+          price: nightFeePerTrip,
+          quantity: 1,
+        });
+      } else {
+        products.push({
+          name: 'Night Service Fee',
+          description: `${nightFeeCount} trips @ $${nightFeePerTrip.toFixed(2)} each`,
+          price: nightFeePerTrip,
+          quantity: nightFeeCount,
+        });
+      }
+    }
+    
+    // Add gratuity
+    if (booking.pricing?.gratuity > 0) {
+      products.push({
+        name: `Gratuity (${booking.pricing.selectedTipPercentage || 15}%)`,
+        price: booking.pricing.gratuity,
+        quantity: 1,
+      });
+    }
+
+    const templateData = {
+      invoiceDate: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      invoiceNumber: booking.bookingNumber,
+      supplier: {
+        name: 'ELITE TRANSPORTATION',
+        address: '4343 W Discovery Way',
+        city: 'Park City, Utah',
+        postCode: '84098',
+        country: 'United States',
+        email: config.email.from,
+        phone: '+1 (435) 901-9158',
+      },
+      customer: {
+        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
+        company: booking.billingDetails?.company || booking.passengerDetails?.company || '',
+        address: booking.billingDetails?.address || '',
+        city: booking.billingDetails?.city || '',
+        postCode: booking.billingDetails?.zipCode || '',
+        country: booking.billingDetails?.country || '',
+      },
+      products,
+      currencySymbol: '$',
+      totalAmount: amount,
+    };
+
+    const html = invoiceTemplate(templateData);
+
+    if (!html) {
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to generate invoice HTML');
+    }
+
+    // Return the HTML directly so browser displays it
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    logger.error('Failed to generate email invoice view:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to generate invoice: ${error.message}`);
+  }
+});
+
+/**
+ * Get invoice by booking number (public route)
+ * @route GET /v1/bookings/invoice/:bookingNumber
+ */
+const getInvoiceByBookingNumber = catchAsync(async (req, res) => {
+  const booking = await bookingService.getBookingByNumber(req.params.bookingNumber);
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+  }
+
+  const customerEmail = booking.email || booking.passengerDetails?.email;
+  if (!booking.payment?.stripePaymentIntentId) {
+    // Return basic invoice data even without payment
+    return res.json({
+      booking: {
+        bookingNumber: booking.bookingNumber,
+        passengerDetails: booking.passengerDetails,
+        pickup: booking.pickup,
+        dropoff: booking.dropoff,
+        service: booking.service,
+        pricing: booking.pricing,
+        payment: booking.payment,
+        status: booking.status,
+        isRoundTrip: booking.isRoundTrip,
+        returnDetails: booking.returnDetails,
+        extras: booking.extras
+      },
+      invoiceHtml: null,
+      hasPayment: false
+    });
+  }
+
+  try {
+    const invoiceTemplate = require('../services/email/templates/invoiceTemplate');
+    const config = require('../config/config');
+
+    // Create the same session-like object used in resendInvoiceEmail
+    const session = {
+      id: booking.payment.stripeSessionId || `session_${booking.payment.stripePaymentIntentId}`,
+      amount_total: booking.payment.amount * 100, // Convert to cents
+      currency: booking.payment.currency || 'usd'
+    };
+
+    const amount = session.amount_total / 100;
+    
+    // Build products array with base service (same logic as invoiceEmailService.js)
+    const products = [];
+    
+    // Add base service with detailed description
+    const basePrice = booking.pricing?.basePrice || amount;
+    
+    // For round trips, split the base price
+    if (booking.isRoundTrip) {
+      const singleTripPrice = basePrice / 2;
+      
+      // Outbound trip
+      products.push({
+        name: `Transportation ${booking.pickup.address.includes('Airport') ? 'from Airport to ' + booking.dropoff.address : 'to ' + booking.dropoff.address}`,
+        description: `${booking.pickup.address} → ${booking.dropoff.address}`,
+        price: singleTripPrice,
+        quantity: 1,
+      });
+      
+      // Return trip
+      if (booking.returnDetails) {
+        products.push({
+          name: `Transportation ${booking.returnDetails.dropoffAddress.includes('Airport') ? 'to Airport' : 'from ' + booking.returnDetails.pickupAddress} (Return)`,
+          description: `${booking.returnDetails.pickupAddress} → ${booking.returnDetails.dropoffAddress}`,
+          price: singleTripPrice,
+          quantity: 1,
+        });
+      }
+    } else {
+      // One-way trip
+      products.push({
+        name: `Transportation ${booking.service === 'from-airport' ? 'from Airport' : booking.service === 'to-airport' ? 'to Airport' : ''}`,
+        description: `${booking.pickup.address} → ${booking.dropoff.address}`,
+        price: basePrice,
+        quantity: 1,
+      });
+    }
+    
+    // Add extras with their actual names
+    if (booking.extras && booking.extras.length > 0) {
+      const populatedExtras = booking.extras.map(extra => {
+        if (extra.item && extra.item.name) {
+          return { ...extra, name: extra.item.name };
+        }
+        return extra;
+      });
+      
+      populatedExtras.forEach(extra => {
+        if (extra.price > 0) {
+          products.push({
+            name: extra.name || 'Extra Service',
+            price: extra.price,
+            quantity: extra.quantity || 1,
+          });
+        }
+      });
+    }
+    
+    // Add night fee if applicable
+    if (booking.pricing?.nightFee > 0) {
+      const nightFeePerTrip = 20;
+      const nightFeeCount = booking.pricing.nightFee / nightFeePerTrip;
+      
+      if (nightFeeCount === 1) {
+        products.push({
+          name: 'Night Service Fee',
+          price: nightFeePerTrip,
+          quantity: 1,
+        });
+      } else {
+        products.push({
+          name: 'Night Service Fee',
+          description: `${nightFeeCount} trips @ $${nightFeePerTrip.toFixed(2)} each`,
+          price: nightFeePerTrip,
+          quantity: nightFeeCount,
+        });
+      }
+    }
+    
+    // Add gratuity
+    if (booking.pricing?.gratuity > 0) {
+      products.push({
+        name: `Gratuity (${booking.pricing.selectedTipPercentage || 15}%)`,
+        price: booking.pricing.gratuity,
+        quantity: 1,
+      });
+    }
+
+    const templateData = {
+      invoiceDate: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      invoiceNumber: booking.bookingNumber,
+      supplier: {
+        name: 'ELITE TRANSPORTATION',
+        address: '4343 W Discovery Way',
+        city: 'Park City, Utah',
+        postCode: '84098',
+        country: 'United States',
+        email: config.email.from,
+        phone: '+1 (435) 901-9158',
+      },
+      customer: {
+        name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
+        company: booking.billingDetails?.company || booking.passengerDetails?.company || '',
+        address: booking.billingDetails?.address || '',
+        city: booking.billingDetails?.city || '',
+        postCode: booking.billingDetails?.zipCode || '',
+        country: booking.billingDetails?.country || '',
+      },
+      products,
+      currencySymbol: '$',
+      totalAmount: amount,
+    };
+
+    const html = invoiceTemplate(templateData);
+
+    if (!html) {
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to generate invoice HTML');
+    }
+
+    // Return both booking data and invoice HTML
+    res.json({
+      booking: {
+        bookingNumber: booking.bookingNumber,
+        passengerDetails: booking.passengerDetails,
+        pickup: booking.pickup,
+        dropoff: booking.dropoff,
+        service: booking.service,
+        pricing: booking.pricing,
+        payment: booking.payment,
+        status: booking.status,
+        isRoundTrip: booking.isRoundTrip,
+        returnDetails: booking.returnDetails,
+        extras: booking.extras,
+        id: booking._id
+      },
+      invoiceHtml: html,
+      hasPayment: true,
+      customerEmail
+    });
+  } catch (error) {
+    logger.error('Failed to generate invoice:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to generate invoice: ${error.message}`);
+  }
 });
 
 module.exports = {
@@ -341,4 +761,7 @@ module.exports = {
   getBookingStats,
   sendReminderEmail,
   resendBookingEmails,
+  resendInvoiceEmail,
+  viewEmailInvoice,
+  getInvoiceByBookingNumber,
 };

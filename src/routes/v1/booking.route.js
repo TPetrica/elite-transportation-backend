@@ -10,6 +10,9 @@ const router = express.Router();
 router.post('/', validate(bookingValidation.createBooking), bookingController.createBooking);
 router.get('/number/:bookingNumber', validate(bookingValidation.getBookingByNumber), bookingController.getBookingByNumber);
 
+// Public invoice route - accessible by booking number
+router.get('/invoice/:bookingNumber', validate(bookingValidation.getBookingByNumber), bookingController.getInvoiceByBookingNumber);
+
 // Protected routes - require authentication
 router.route('/').get(auth(), validate(bookingValidation.getBookings), bookingController.getBookings);
 
@@ -33,12 +36,20 @@ router.post(
   bookingController.sendReminderEmail
 );
 
-// Resend booking emails (confirmation + invoice)
+// Resend booking confirmation email
 router.post(
   '/:bookingId/resend-emails',
   auth('manageBookings'),
   validate(bookingValidation.getBooking),
   bookingController.resendBookingEmails
+);
+
+// Resend invoice email
+router.post(
+  '/:bookingId/resend-invoice',
+  auth('manageBookings'),
+  validate(bookingValidation.getBooking),
+  bookingController.resendInvoiceEmail
 );
 
 // Attach user to booking
@@ -51,5 +62,8 @@ router.post(
 
 // Get bookings for authenticated user
 router.get('/user/bookings', auth(), validate(bookingValidation.getUserBookings), bookingController.getUserBookings);
+
+// View email invoice template
+router.get('/:bookingId/email-invoice', validate(bookingValidation.getBooking), bookingController.viewEmailInvoice);
 
 module.exports = router;

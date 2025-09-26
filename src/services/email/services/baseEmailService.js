@@ -22,7 +22,14 @@ class BaseEmailService {
       config.email?.smtp?.auth?.user &&
       config.email?.smtp?.auth?.pass
     ) {
-      const transport = nodemailer.createTransport(config.email.smtp);
+      const transport = nodemailer.createTransport({
+        ...config.email.smtp,
+        // Add connection pooling for better performance
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 10,
+        rateLimit: 10 // 10 emails per second max
+      });
 
       logger.info('SMTP Config:', config.email.smtp);
       transport

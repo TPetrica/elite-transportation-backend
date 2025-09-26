@@ -62,7 +62,7 @@ async function sendTestEmail() {
     // Email options
     const mailOptions = {
       from: config.email.from,
-      to: 'elitetransportationpc@gmail.com',
+      to: 'petru.tirla@gmail.com',
       subject: `Booking Confirmation - #${testBookingData.bookingNumber}`,
       html: htmlContent,
       text: `Your booking (#${testBookingData.bookingNumber}) for Airport Drop-off Service on June 24th 2025 at 7:30 AM has been confirmed. Pickup: ${testBookingData.pickup.address}. Thank you!`,

@@ -47,7 +47,10 @@ const sendReturnTripReminders = async () => {
             address: booking.returnDetails.dropoffAddress,
             coordinates: booking.returnDetails.dropoffCoordinates
           },
-          passengerDetails: booking.passengerDetails,
+          passengerDetails: {
+            ...booking.passengerDetails,
+            email: booking.email // Add email to passengerDetails for template compatibility
+          },
           distance: booking.distance,
           duration: booking.duration,
           extras: booking.extras,

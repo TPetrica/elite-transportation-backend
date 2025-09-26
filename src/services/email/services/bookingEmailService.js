@@ -81,30 +81,26 @@ class BookingEmailService extends BaseEmailService {
 
       const subject = `${subjectPrefix}Booking Confirmation - #${bookingData.bookingNumber}`;
 
-      // Send to customer
-      await this.sendEmail(to, subject, text, html);
-
-      // Send copies to other recipients if needed
-      const recipients = [];
+      // Collect all recipients for parallel sending
+      const allRecipients = [to]; // Customer first
       
       // Admin email
       if (config.email.from) {
-        recipients.push(config.email.from);
+        allRecipients.push(config.email.from);
       }
 
       // Affiliate email for PCH bookings
       if (bookingData.affiliate === true && bookingData.affiliateCode === 'PCH') {
-        recipients.push('parkcityhostel@gmail.com');
+        allRecipients.push('parkcityhostel@gmail.com');
       }
 
-      if (recipients.length > 0) {
-        await this.sendToMultipleRecipients(recipients, subject, text, html);
-      }
+      // Send to all recipients in parallel
+      await this.sendToMultipleRecipients(allRecipients, subject, text, html);
 
       logger.info('Booking confirmation emails sent successfully:', {
         to,
         bookingNumber: bookingData.bookingNumber,
-        additionalRecipients: recipients.length,
+        additionalRecipients: allRecipients.length - 1, // -1 because first recipient is the customer
       });
     } catch (error) {
       logger.error('Error sending booking confirmation emails:', {
