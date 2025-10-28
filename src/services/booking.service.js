@@ -8,7 +8,7 @@ const emailService = require('./email/emailService');
 const affiliateService = require('./affiliate.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
-const { convertTo24Hour } = require('../utils/timeFormat');
+const { normalizeTimeString } = require('../utils/timeFormat');
 
 const createBooking = async (bookingBody) => {
   try {
@@ -70,9 +70,11 @@ const createBooking = async (bookingBody) => {
       }
     }
     
-    // Convert pickup time from AM/PM to 24-hour format for availability check
-    const pickupTime24h = convertTo24Hour(bookingBody.pickup.time);
-    logger.info(`Converting pickup time from ${bookingBody.pickup.time} to ${pickupTime24h}`);
+    const pickupTime24h = normalizeTimeString(bookingBody.pickup.time);
+    if (!pickupTime24h) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid pickup time format');
+    }
+    logger.info(`Normalizing pickup time from ${bookingBody.pickup.time} to ${pickupTime24h}`);
 
     const isAvailable = await availabilityService.checkTimeSlotAvailability(
       bookingBody.pickup.date,
@@ -90,15 +92,20 @@ const createBooking = async (bookingBody) => {
       ...bookingBody,
       pickup: {
         ...bookingBody.pickup,
-        time: pickupTime24h
-      }
+        time: pickupTime24h,
+      },
     };
     
     // Convert return time if exists
     if (bookingBody.returnDetails?.time) {
+      const normalizedReturnTime = normalizeTimeString(bookingBody.returnDetails.time);
+      if (!normalizedReturnTime) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid return pickup time format');
+      }
+
       bookingDataForStorage.returnDetails = {
         ...bookingBody.returnDetails,
-        time: convertTo24Hour(bookingBody.returnDetails.time)
+        time: normalizedReturnTime,
       };
     }
 
@@ -417,6 +424,22 @@ const updateBookingById = async (bookingId, updateBody) => {
           price: extraDoc.price * extra.quantity,
         };
       });
+    }
+
+    if (updateBody.pickup?.time) {
+      const normalizedPickupTime = normalizeTimeString(updateBody.pickup.time);
+      if (!normalizedPickupTime) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid pickup time format');
+      }
+      updateBody.pickup.time = normalizedPickupTime;
+    }
+
+    if (updateBody.returnDetails?.time) {
+      const normalizedReturnTime = normalizeTimeString(updateBody.returnDetails.time);
+      if (!normalizedReturnTime) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid return pickup time format');
+      }
+      updateBody.returnDetails.time = normalizedReturnTime;
     }
 
     // If updating time/date, check if the new slot is available

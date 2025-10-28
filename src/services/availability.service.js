@@ -4,21 +4,37 @@ const { Schedule, DateException, ManualBooking } = require('../models');
 const Booking = require('../models/booking.model');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const {
+  timeStringToMinutes,
+  minutesToTimeString,
+  normalizeTimeString,
+} = require('../utils/timeFormat');
 
 class AvailabilityService {
   timeToMinutes(time) {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
+    const minutes = timeStringToMinutes(time);
+    if (minutes === null) {
+      logger.warn('Failed to convert time to minutes', { time });
+    }
+    return minutes;
   }
 
   minutesToTime(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    const timeString = minutesToTimeString(minutes);
+    if (!timeString) {
+      logger.warn('Failed to convert minutes to time string', { minutes });
+    }
+    return timeString;
   }
 
   getBlockedTimeRange(bookingTime, duration = 90) {
     const bookingMinutes = this.timeToMinutes(bookingTime);
+    if (bookingMinutes === null) {
+      logger.warn('Skipping blocked time calculation due to invalid booking time', {
+        bookingTime,
+      });
+      return [];
+    }
 
     // Block 30 minutes before (preparation and travel to pickup)
     const blockedStart = Math.max(0, bookingMinutes - 30);
@@ -35,7 +51,10 @@ class AvailabilityService {
 
     const blockedTimes = [];
     for (let i = blockedStart; i <= blockedEnd; i += 30) {
-      blockedTimes.push(this.minutesToTime(i));
+      const slot = this.minutesToTime(i);
+      if (slot) {
+        blockedTimes.push(slot);
+      }
     }
 
     logger.debug('Generated blocked time slots:', {
@@ -53,10 +72,29 @@ class AvailabilityService {
     const MINUTES_IN_DAY = 24 * 60;
 
     for (let minutes = 0; minutes < MINUTES_IN_DAY; minutes += INTERVAL) {
-      slots.push(this.minutesToTime(minutes));
+      const slot = this.minutesToTime(minutes);
+      if (slot) {
+        slots.push(slot);
+      }
     }
 
     return slots;
+  }
+
+  normalizeScheduleRanges(timeRanges = []) {
+    return timeRanges
+      .map((range) => {
+        const start = normalizeTimeString(range.start);
+        const end = normalizeTimeString(range.end);
+
+        if (!start || !end) {
+          logger.warn('Skipping invalid schedule range', range);
+          return null;
+        }
+
+        return { start, end };
+      })
+      .filter(Boolean);
   }
 
   // Check if date has an exception
@@ -137,6 +175,12 @@ class AvailabilityService {
       return { availableSlots: [] };
     }
 
+    const normalizedRanges = this.normalizeScheduleRanges(schedule.timeRanges);
+    if (normalizedRanges.length === 0) {
+      logger.debug(`All schedule ranges invalid after normalization`);
+      return { availableSlots: [] };
+    }
+
     // Generate all possible slots
     const allSlots = this.generateTimeSlots();
 
@@ -173,7 +217,16 @@ class AvailabilityService {
     // Get all blocked times based on bookings
     const blockedTimes = new Set();
     bookings.forEach((booking) => {
-      const blockedRange = this.getBlockedTimeRange(booking.pickup.time);
+      const normalized = normalizeTimeString(booking.pickup.time);
+      if (!normalized) {
+        logger.warn('Skipping booking with invalid pickup time', {
+          bookingId: booking._id,
+          pickupTime: booking.pickup.time,
+        });
+        return;
+      }
+
+      const blockedRange = this.getBlockedTimeRange(normalized);
       blockedRange.forEach((time) => blockedTimes.add(time));
     });
     
@@ -181,10 +234,21 @@ class AvailabilityService {
     manualBookings.forEach((manualBooking) => {
       const startMinutes = this.timeToMinutes(manualBooking.startTime);
       const endMinutes = this.timeToMinutes(manualBooking.endTime);
-      
-      // Block all time slots that overlap with the manual booking
+
+      if (startMinutes === null || endMinutes === null) {
+        logger.warn('Skipping manual booking with invalid time range', {
+          manualBookingId: manualBooking._id,
+          startTime: manualBooking.startTime,
+          endTime: manualBooking.endTime,
+        });
+        return;
+      }
+
       for (let minutes = startMinutes; minutes <= endMinutes; minutes += 30) {
-        blockedTimes.add(this.minutesToTime(minutes));
+        const slot = this.minutesToTime(minutes);
+        if (slot) {
+          blockedTimes.add(slot);
+        }
       }
     });
 
@@ -196,12 +260,18 @@ class AvailabilityService {
     for (const time of allSlots) {
       // Check if within schedule
       let isWithinSchedule = false;
-      for (const range of schedule.timeRanges) {
+      for (const range of normalizedRanges) {
         const slotMinutes = this.timeToMinutes(time);
         const startMinutes = this.timeToMinutes(range.start);
         const endMinutes = this.timeToMinutes(range.end);
 
-        if (slotMinutes >= startMinutes && slotMinutes <= endMinutes) {
+        if (
+          slotMinutes !== null &&
+          startMinutes !== null &&
+          endMinutes !== null &&
+          slotMinutes >= startMinutes &&
+          slotMinutes <= endMinutes
+        ) {
           isWithinSchedule = true;
           break;
         }
@@ -237,9 +307,15 @@ class AvailabilityService {
 
   async checkTimeSlotAvailability(date, time, excludeBookingId = null) {
     try {
+      const normalizedTime = normalizeTimeString(time);
+      if (!normalizedTime) {
+        logger.warn('Invalid time provided to availability check', { time });
+        return false;
+      }
+
       const requestedDate = moment(date);
       logger.info(
-        `Checking availability for date: ${requestedDate.format('YYYY-MM-DD')}, time: ${time}, excludeBookingId: ${
+        `Checking availability for date: ${requestedDate.format('YYYY-MM-DD')}, time: ${normalizedTime}, excludeBookingId: ${
           excludeBookingId || 'none'
         }`
       );
@@ -255,20 +331,27 @@ class AvailabilityService {
 
         // For custom hours, check against exception time ranges
         if (dateException.type === 'custom-hours') {
+          const normalizedExceptionRanges = this.normalizeScheduleRanges(dateException.timeRanges);
           let isWithinCustomRange = false;
-          for (const range of dateException.timeRanges) {
-            const slotMinutes = this.timeToMinutes(time);
+          for (const range of normalizedExceptionRanges) {
+            const slotMinutes = this.timeToMinutes(normalizedTime);
             const startMinutes = this.timeToMinutes(range.start);
             const endMinutes = this.timeToMinutes(range.end);
 
-            if (slotMinutes >= startMinutes && slotMinutes <= endMinutes) {
+            if (
+              slotMinutes !== null &&
+              startMinutes !== null &&
+              endMinutes !== null &&
+              slotMinutes >= startMinutes &&
+              slotMinutes <= endMinutes
+            ) {
               isWithinCustomRange = true;
               break;
             }
           }
 
           if (!isWithinCustomRange) {
-            logger.debug(`Time ${time} is outside of allowed custom schedule for the date`);
+            logger.debug(`Time ${normalizedTime} is outside of allowed custom schedule for the date`);
             return false;
           }
         }
@@ -290,20 +373,27 @@ class AvailabilityService {
         }
 
         // Check if time is within allowed schedule
+        const normalizedScheduleRanges = this.normalizeScheduleRanges(schedule.timeRanges);
         let isWithinSchedule = false;
-        for (const range of schedule.timeRanges) {
-          const slotMinutes = this.timeToMinutes(time);
+        for (const range of normalizedScheduleRanges) {
+          const slotMinutes = this.timeToMinutes(normalizedTime);
           const startMinutes = this.timeToMinutes(range.start);
           const endMinutes = this.timeToMinutes(range.end);
 
-          if (slotMinutes >= startMinutes && slotMinutes <= endMinutes) {
+          if (
+            slotMinutes !== null &&
+            startMinutes !== null &&
+            endMinutes !== null &&
+            slotMinutes >= startMinutes &&
+            slotMinutes <= endMinutes
+          ) {
             isWithinSchedule = true;
             break;
           }
         }
 
         if (!isWithinSchedule) {
-          logger.debug(`Time ${time} is outside of allowed schedule`);
+          logger.debug(`Time ${normalizedTime} is outside of allowed schedule`);
           return false;
         }
       }
@@ -329,11 +419,20 @@ class AvailabilityService {
 
       // Check if time is blocked by any booking
       const isBlocked = bookings.some((booking) => {
-        const blockedRange = this.getBlockedTimeRange(booking.pickup.time);
-        const isTimeBlocked = blockedRange.includes(time);
+        const normalized = normalizeTimeString(booking.pickup.time);
+        if (!normalized) {
+          logger.warn('Skipping booking during availability check due to invalid pickup time', {
+            bookingId: booking._id,
+            pickupTime: booking.pickup.time,
+          });
+          return false;
+        }
+
+        const blockedRange = this.getBlockedTimeRange(normalized);
+        const isTimeBlocked = blockedRange.includes(normalizedTime);
 
         if (isTimeBlocked) {
-          logger.debug(`Time ${time} is blocked by booking at ${booking.pickup.time} (ID: ${booking._id})`);
+          logger.debug(`Time ${normalizedTime} is blocked by booking at ${booking.pickup.time} (ID: ${booking._id})`);
         }
 
         return isTimeBlocked;
@@ -344,11 +443,11 @@ class AvailabilityService {
       }
 
       // Check if time is in the past
-      const slotTime = moment(`${requestedDate.format('YYYY-MM-DD')} ${time}`);
+      const slotTime = moment(`${requestedDate.format('YYYY-MM-DD')} ${normalizedTime}`);
       const isPastTime = slotTime.isSameOrBefore(moment().add(2, 'hours'));
 
       const isAvailable = !isPastTime;
-      logger.debug(`Time slot ${time} availability check result:`, { isAvailable });
+      logger.debug(`Time slot ${normalizedTime} availability check result:`, { isAvailable });
 
       return isAvailable;
     } catch (error) {
@@ -379,21 +478,32 @@ class AvailabilityService {
 
       // Validate time ranges
       if (timeRanges) {
-        for (const range of timeRanges) {
+        const normalizedRanges = this.normalizeScheduleRanges(timeRanges);
+
+        if (normalizedRanges.length !== timeRanges.length) {
+          logger.warn('Some schedule time ranges were invalid and removed during normalization', {
+            originalCount: timeRanges.length,
+            normalizedCount: normalizedRanges.length,
+          });
+        }
+
+        for (const range of normalizedRanges) {
           const startMinutes = this.timeToMinutes(range.start);
           const endMinutes = this.timeToMinutes(range.end);
 
-          if (startMinutes >= endMinutes) {
+          if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) {
             throw new ApiError(
               httpStatus.BAD_REQUEST,
               `Invalid time range: start time (${range.start}) must be before end time (${range.end})`
             );
           }
         }
+
+        updateData.timeRanges = normalizedRanges;
       }
 
       const updateObj = {};
-      if (timeRanges) updateObj.timeRanges = timeRanges;
+      if (updateData.timeRanges) updateObj.timeRanges = updateData.timeRanges;
       if (isEnabled !== undefined) updateObj.isEnabled = isEnabled;
 
       const schedule = await Schedule.findOneAndUpdate(

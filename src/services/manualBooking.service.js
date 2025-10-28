@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const { ManualBooking } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { normalizeTimeString } = require('../utils/timeFormat');
 
 /**
  * Create a manual booking
@@ -9,11 +10,18 @@ const ApiError = require('../utils/ApiError');
  * @returns {Promise<ManualBooking>}
  */
 const createManualBooking = async (manualBookingBody, userId) => {
+  const normalizedStartTime = normalizeTimeString(manualBookingBody.startTime);
+  const normalizedEndTime = normalizeTimeString(manualBookingBody.endTime);
+
+  if (!normalizedStartTime || !normalizedEndTime) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid time format');
+  }
+
   // Check for time conflicts
   const hasConflict = await ManualBooking.hasTimeConflict(
     manualBookingBody.date,
-    manualBookingBody.startTime,
-    manualBookingBody.endTime
+    normalizedStartTime,
+    normalizedEndTime
   );
 
   if (hasConflict) {
@@ -21,8 +29,8 @@ const createManualBooking = async (manualBookingBody, userId) => {
   }
 
   // Validate time range
-  const startTime = manualBookingBody.startTime.split(':');
-  const endTime = manualBookingBody.endTime.split(':');
+  const startTime = normalizedStartTime.split(':');
+  const endTime = normalizedEndTime.split(':');
   const startMinutes = parseInt(startTime[0]) * 60 + parseInt(startTime[1]);
   const endMinutes = parseInt(endTime[0]) * 60 + parseInt(endTime[1]);
 
@@ -32,6 +40,8 @@ const createManualBooking = async (manualBookingBody, userId) => {
 
   return ManualBooking.create({
     ...manualBookingBody,
+    startTime: normalizedStartTime,
+    endTime: normalizedEndTime,
     createdBy: userId,
   });
 };
@@ -109,8 +119,12 @@ const updateManualBookingById = async (manualBookingId, updateBody) => {
   // If time is being updated, check for conflicts
   if (updateBody.date || updateBody.startTime || updateBody.endTime) {
     const date = updateBody.date || manualBooking.date;
-    const startTime = updateBody.startTime || manualBooking.startTime;
-    const endTime = updateBody.endTime || manualBooking.endTime;
+    const startTime = normalizeTimeString(updateBody.startTime || manualBooking.startTime);
+    const endTime = normalizeTimeString(updateBody.endTime || manualBooking.endTime);
+
+    if (!startTime || !endTime) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid time format');
+    }
 
     const hasConflict = await ManualBooking.hasTimeConflict(
       date,
@@ -132,6 +146,9 @@ const updateManualBookingById = async (manualBookingId, updateBody) => {
     if (startMinutes >= endMinutes) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'End time must be after start time');
     }
+
+    updateBody.startTime = startTime;
+    updateBody.endTime = endTime;
   }
 
   Object.assign(manualBooking, updateBody);
