@@ -32,6 +32,7 @@ const envVarsSchema = Joi.object()
     STRIPE_WEBHOOK_SECRET: Joi.string().required().description('Stripe Webhook Secret'),
     CLIENT_URL: Joi.string().required().description('Client URL'),
     SUPPORT_PHONE: Joi.string().required().description('Support Phone Number'),
+    ALLOW_OVERLAPPING_BOOKINGS: Joi.boolean().default(true),
   })
   .unknown();
 
@@ -84,4 +85,7 @@ module.exports = {
   },
   clientUrl: envVars.CLIENT_URL,
   supportPhone: envVars.SUPPORT_PHONE,
+  booking: {
+    allowOverlappingBookings: envVars.ALLOW_OVERLAPPING_BOOKINGS,
+  },
 };

@@ -155,7 +155,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
             flightTime: bookingData.pickup?.flightTime || bookingData.passengerDetails?.flightTime || '',
             distance: bookingData.distance ? `${bookingData.distance.miles || 0} miles / ${bookingData.distance.km || 0} km` : '',
             duration: bookingData.duration || '',
-            isRoundTrip: bookingData.isRoundTrip ? 'true' : 'false',
+            tripType: bookingData.isRoundTrip ? 'round-trip' : 'one-way',
             affiliate: bookingData.affiliate ? 'true' : 'false',
             affiliateCode: bookingData.affiliateCode || '',
             notes: bookingData.passengerDetails?.notes || '',

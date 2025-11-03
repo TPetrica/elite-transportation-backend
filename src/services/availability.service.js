@@ -4,6 +4,7 @@ const { Schedule, DateException, ManualBooking } = require('../models');
 const Booking = require('../models/booking.model');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const config = require('../config/config');
 const {
   timeStringToMinutes,
   minutesToTimeString,
@@ -255,6 +256,7 @@ class AvailabilityService {
     logger.debug(`Total blocked times: ${blockedTimes.size}`);
 
     // Filter available slots
+    const allowOverlappingBookings = config.booking?.allowOverlappingBookings;
     const availableSlots = [];
 
     for (const time of allSlots) {
@@ -279,6 +281,7 @@ class AvailabilityService {
 
       // Check if blocked
       const isBlocked = blockedTimes.has(time);
+      const isBlockedForAvailability = !allowOverlappingBookings && isBlocked;
 
       // Check if in past (with 2 hour buffer)
       const isInPast =
@@ -286,12 +289,13 @@ class AvailabilityService {
         moment(`${requestedDate.format('YYYY-MM-DD')} ${time}`).isSameOrBefore(moment().add(2, 'hours'));
 
       // Only add to available slots if all conditions are met
-      if (isWithinSchedule && !isBlocked && !isInPast) {
+      if (isWithinSchedule && !isBlockedForAvailability && !isInPast) {
         availableSlots.push(time);
       } else {
         logger.debug(`Time slot ${time} is unavailable:`, {
           isWithinSchedule,
           isBlocked,
+          ignoredBlockedConstraint: allowOverlappingBookings && isBlocked,
           isInPast,
         });
       }
@@ -319,6 +323,7 @@ class AvailabilityService {
           excludeBookingId || 'none'
         }`
       );
+      const allowOverlappingBookings = config.booking?.allowOverlappingBookings;
 
       // First check for date exception
       const dateException = await this.getDateException(date);
@@ -417,29 +422,32 @@ class AvailabilityService {
 
       const bookings = await Booking.find(query).select('pickup.time duration _id');
 
-      // Check if time is blocked by any booking
-      const isBlocked = bookings.some((booking) => {
-        const normalized = normalizeTimeString(booking.pickup.time);
-        if (!normalized) {
-          logger.warn('Skipping booking during availability check due to invalid pickup time', {
-            bookingId: booking._id,
-            pickupTime: booking.pickup.time,
-          });
+      if (!allowOverlappingBookings) {
+        const isBlocked = bookings.some((booking) => {
+          const normalized = normalizeTimeString(booking.pickup.time);
+          if (!normalized) {
+            logger.warn('Skipping booking during availability check due to invalid pickup time', {
+              bookingId: booking._id,
+              pickupTime: booking.pickup.time,
+            });
+            return false;
+          }
+
+          const blockedRange = this.getBlockedTimeRange(normalized);
+          const isTimeBlocked = blockedRange.includes(normalizedTime);
+
+          if (isTimeBlocked) {
+            logger.debug(`Time ${normalizedTime} is blocked by booking at ${booking.pickup.time} (ID: ${booking._id})`);
+          }
+
+          return isTimeBlocked;
+        });
+
+        if (isBlocked) {
           return false;
         }
-
-        const blockedRange = this.getBlockedTimeRange(normalized);
-        const isTimeBlocked = blockedRange.includes(normalizedTime);
-
-        if (isTimeBlocked) {
-          logger.debug(`Time ${normalizedTime} is blocked by booking at ${booking.pickup.time} (ID: ${booking._id})`);
-        }
-
-        return isTimeBlocked;
-      });
-
-      if (isBlocked) {
-        return false;
+      } else {
+        logger.debug('Skipping booking conflict checks - overlapping bookings are enabled');
       }
 
       // Check if time is in the past
