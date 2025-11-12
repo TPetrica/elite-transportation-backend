@@ -8,6 +8,7 @@ const emailService = require('./email/emailService');
 const affiliateService = require('./affiliate.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const config = require('../config/config');
 const { normalizeTimeString } = require('../utils/timeFormat');
 
 const createBooking = async (bookingBody) => {
@@ -80,8 +81,9 @@ const createBooking = async (bookingBody) => {
       bookingBody.pickup.date,
       pickupTime24h
     );
+    const allowOverlappingBookings = config.booking?.allowOverlappingBookings !== false;
 
-    if (!isAvailable) {
+    if (!allowOverlappingBookings && !isAvailable) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Selected time slot is no longer available');
     }
 

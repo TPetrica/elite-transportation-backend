@@ -86,6 +86,6 @@ module.exports = {
   clientUrl: envVars.CLIENT_URL,
   supportPhone: envVars.SUPPORT_PHONE,
   booking: {
-    allowOverlappingBookings: envVars.ALLOW_OVERLAPPING_BOOKINGS,
+    allowOverlappingBookings: envVars.ALLOW_OVERLAPPING_BOOKINGS ?? true,
   },
 };
