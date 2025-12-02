@@ -6,6 +6,13 @@ const { initializeCronJobs } = require('./jobs/returnTripReminder');
 
 let server;
 
+// Debug: Log MongoDB URL (masked)
+const mongoUrl = config.mongoose.url || '';
+const maskedUrl = mongoUrl.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+console.log('MongoDB URL (masked):', maskedUrl);
+console.log('MongoDB URL length:', mongoUrl.length);
+console.log('First 20 chars:', mongoUrl.substring(0, 20));
+
 // Connect to MongoDB
 mongoose.connect(config.mongoose.url, config.mongoose.options).then(() => {
   logger.info('Connected to MongoDB');
