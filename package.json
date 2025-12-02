@@ -8,7 +8,7 @@
   "author": "Hagop Jamkojian <hagopj13@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=12.0.0"
+    "node": "20.x"
   },
   "scripts": {
     "start": "pm2 start ecosystem.config.json --no-daemon",
