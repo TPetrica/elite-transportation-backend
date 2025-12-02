@@ -9,3 +9,4 @@ module.exports.availabilityValidation = require('./availability.validation');
 module.exports.blogValidation = require('./blog.validation');
 module.exports.affiliateValidation = require('./affiliate.validation');
 module.exports.manualBookingValidation = require('./manualBooking.validation');
+module.exports.contactValidation = require('./contact.validation');

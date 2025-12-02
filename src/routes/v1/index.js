@@ -9,6 +9,7 @@ const availabilityRoute = require('./availability.route');
 const blogRoute = require('./blog.route');
 const affiliateRoute = require('./affiliate.route');
 const manualBookingRoute = require('./manualBooking.route');
+const contactRoute = require('./contact.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
 
@@ -54,6 +55,10 @@ const defaultRoutes = [
   {
     path: '/manual-bookings',
     route: manualBookingRoute,
+  },
+  {
+    path: '/contact',
+    route: contactRoute,
   },
 ];
 

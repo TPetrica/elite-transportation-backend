@@ -12,3 +12,4 @@ module.exports.availabilityService = require('./availability.service');
 module.exports.blogService = require('./blog.service');
 module.exports.affiliateService = require('./affiliate.service');
 module.exports.manualBookingService = require('./manualBooking.service');
+module.exports.contactService = require('./contact.service');
