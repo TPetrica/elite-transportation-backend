@@ -17,6 +17,9 @@ const submitContactForm = {
       'string.max': 'Message must not exceed 5000 characters',
       'any.required': 'Message is required',
     }),
+    turnstileToken: Joi.string().required().messages({
+      'any.required': 'Security verification is required',
+    }),
   }),
 };
 
