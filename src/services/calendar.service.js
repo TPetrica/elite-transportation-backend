@@ -117,6 +117,15 @@ class CalendarService {
 
       const endDateTime = moment(pickupDateTime).add(30, 'minutes');
 
+      // Format extras for the description
+      let extrasSection = '';
+      if (booking.extras && booking.extras.length > 0) {
+        const extrasLines = booking.extras.map(extra =>
+          `  - ${extra.name}: ${extra.quantity}${extra.quantity > 1 ? ' units' : ''}`
+        ).join('\n');
+        extrasSection = `\nExtras/Add-ons:\n${extrasLines}`;
+      }
+
       const event = {
         summary: `Ride #${booking.bookingNumber}${isReturn ? ' (Return)' : ''}`,
         description: `
@@ -130,11 +139,12 @@ Passenger Details:
 - Email: ${booking.email}
 - Passengers: ${booking.passengerDetails.passengers}
 - Luggage: ${booking.passengerDetails.luggage}
+- Ski Bags: ${booking.passengerDetails.skiBags || 0}
 ${
   booking.passengerDetails.specialRequirements
     ? '- Special Requirements: ' + booking.passengerDetails.specialRequirements
     : ''
-}
+}${extrasSection}
 
 Service: ${booking.service}${isReturn ? ' (Return Trip)' : ''}
 Distance: ${booking.distance.miles} miles
