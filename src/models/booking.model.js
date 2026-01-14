@@ -136,7 +136,7 @@ const bookingSchema = mongoose.Schema(
     payment: {
       method: {
         type: String,
-        enum: ['credit_card', 'paypal'],
+        enum: ['credit_card', 'paypal', 'cash'],
         required: true,
       },
       status: {
@@ -152,10 +152,19 @@ const bookingSchema = mongoose.Schema(
         type: String,
         default: 'USD',
       },
+      stripeCustomerId: {
+        type: String,
+      },
       stripePaymentIntentId: {
         type: String,
       },
       stripeSessionId: {
+        type: String,
+      },
+      stripeSetupIntentId: {
+        type: String,
+      },
+      stripePaymentMethodId: {
         type: String,
       },
     },

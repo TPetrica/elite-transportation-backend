@@ -98,12 +98,25 @@ const getSessionById = async (sessionId) => {
       };
     }
 
+    const amount =
+      typeof stripeSession.amount_total === 'number'
+        ? stripeSession.amount_total / 100
+        : payment.amount;
+
+    const paymentMethod =
+      payment.booking?.payment?.method ||
+      payment.metadata?.paymentMethod ||
+      payment.metadata?.payment_method ||
+      'card';
+
     return {
-      amount: stripeSession.amount_total / 100,
+      amount,
       status: payment.status,
       email: stripeSession.customer_details?.email || payment.metadata?.customerEmail,
       billingDetails: payment.billingDetails,
       bookingDetails,
+      paymentMethod,
+      sessionMode: stripeSession.mode,
       metadata: payment.metadata || {},
     };
   } catch (error) {

@@ -3,9 +3,11 @@ const Joi = require('joi');
 const createCheckoutSession = {
   body: Joi.object().keys({
     amount: Joi.number().required(),
+    paymentMethod: Joi.string().valid('card', 'cash').default('card'),
     billingDetails: Joi.object({
       firstName: Joi.string().required(),
       lastName: Joi.string().required(),
+      phone: Joi.string().optional(),
       company: Joi.string().allow(''),
       address: Joi.string().required(),
       city: Joi.string().required(),

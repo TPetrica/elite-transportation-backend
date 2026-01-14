@@ -8,7 +8,8 @@ const ApiError = require('../utils/ApiError');
 const { Payment, Booking } = require('../models');
 
 const createCheckoutSession = catchAsync(async (req, res) => {
-  const { amount, billingDetails, bookingData } = req.body;
+  const { amount, billingDetails, bookingData, paymentMethod = 'card' } = req.body;
+  const isCash = paymentMethod === 'cash';
 
   console.log('amount', amount)
   console.log('billingDetails', billingDetails)
@@ -18,6 +19,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
     const customer = await stripe.customers.create({
       email: bookingData.email,
       name: `${billingDetails.firstName} ${billingDetails.lastName}`,
+      phone: bookingData.passengerDetails?.phone || billingDetails.phone,
       address: {
         line1: billingDetails.address,
         city: billingDetails.city,
@@ -48,14 +50,55 @@ const createCheckoutSession = catchAsync(async (req, res) => {
           ...modifiedBookingData,
           billingDetails,
           payment: {
-            method: 'credit_card',
+            method: isCash ? 'cash' : 'credit_card',
             amount: amount,
             status: 'pending',
           },
         }),
         customerEmail: bookingData.email,
+        paymentMethod: isCash ? 'cash' : 'card',
       },
     });
+
+    if (isCash) {
+      const session = await stripe.checkout.sessions.create({
+        customer: customer.id,
+        customer_update: {
+          name: 'auto',
+          address: 'auto',
+          shipping: 'never',
+        },
+        payment_method_types: ['card'],
+        mode: 'setup',
+        success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
+        setup_intent_data: {
+          usage: 'off_session',
+          metadata: {
+            paymentId: tempPayment._id.toString(),
+            paymentMethod: 'cash',
+          },
+        },
+        metadata: {
+          paymentId: tempPayment._id.toString(),
+          paymentMethod: 'cash',
+        },
+      });
+
+      logger.info('Stripe setup session created for cash booking:', {
+        sessionId: session.id,
+        customerId: customer.id,
+      });
+
+      await Payment.findByIdAndUpdate(tempPayment._id, {
+        stripeSessionId: session.id,
+      });
+
+      return res.json({
+        url: session.url,
+        sessionId: session.id,
+      });
+    }
 
     // Calculate tax using Stripe Tax API
     let taxCalculation = null;
@@ -130,6 +173,11 @@ const createCheckoutSession = catchAsync(async (req, res) => {
     // Create Stripe Session with automatic invoice creation
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+        shipping: 'never',
+      },
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
@@ -246,6 +294,91 @@ const handleWebhook = async (req, res) => {
 
           const bookingData = JSON.parse(payment.metadata.bookingData);
 
+          // Cash bookings: Checkout in setup mode (card on file, no charge)
+          if (session.mode === 'setup') {
+            let setupIntent = null;
+            try {
+              if (session.setup_intent) {
+                setupIntent = await stripe.setupIntents.retrieve(session.setup_intent);
+              }
+            } catch (setupIntentError) {
+              logger.warn('Could not retrieve SetupIntent, continuing without payment method id:', {
+                error: setupIntentError.message,
+                sessionId: session.id,
+                setupIntentId: session.setup_intent,
+              });
+            }
+
+            let booking;
+            try {
+              booking = await bookingService.createBooking({
+                ...bookingData,
+                status: 'confirmed',
+                payment: {
+                  method: 'cash',
+                  amount: payment.amount,
+                  status: 'pending',
+                  stripeSessionId: session.id,
+                  stripeCustomerId: session.customer,
+                  stripeSetupIntentId: session.setup_intent,
+                  stripePaymentMethodId: setupIntent?.payment_method || undefined,
+                },
+              });
+
+              logger.info('Cash booking created after card guarantee setup:', {
+                bookingId: booking._id,
+                bookingNumber: booking.bookingNumber,
+                sessionId: session.id,
+              });
+            } catch (bookingError) {
+              logger.error('Cash booking creation failed:', {
+                error: bookingError.message,
+                stack: bookingError.stack,
+                sessionId: session.id,
+                paymentId: payment._id,
+              });
+
+              await Payment.findByIdAndUpdate(payment._id, {
+                status: 'failed',
+                'metadata.bookingCreationFailed': true,
+                'metadata.bookingError': bookingError.message,
+              });
+
+              booking = null;
+            }
+
+            if (booking) {
+              try {
+                await Payment.findByIdAndUpdate(payment._id, {
+                  status: 'completed',
+                  booking: booking._id,
+                  'metadata.bookingNumber': booking.bookingNumber,
+                  'metadata.paymentMethod': 'cash',
+                  'metadata.stripeSetupIntentId': session.setup_intent,
+                });
+              } catch (updateError) {
+                logger.error('Payment update failed for cash booking but continuing workflow:', {
+                  error: updateError.message,
+                  paymentId: payment._id,
+                });
+              }
+
+              try {
+                await calendarService.createEvent(booking);
+                logger.info('Calendar event created successfully for cash booking:', {
+                  bookingId: booking._id,
+                });
+              } catch (calendarError) {
+                logger.error('Calendar event creation failed for cash booking but continuing workflow:', {
+                  error: calendarError.message,
+                  bookingId: booking._id,
+                });
+              }
+            }
+
+            break;
+          }
+
           // Debug logging for webhook booking data
           logger.info('=== STRIPE WEBHOOK DEBUG DATA ===');
           logger.info('Raw booking data from payment metadata:', bookingData);
@@ -262,11 +395,13 @@ const handleWebhook = async (req, res) => {
           // Create the booking now that payment is completed
           let booking;
           try {
+            const chargedAmount = typeof session.amount_total === 'number' ? session.amount_total / 100 : payment.amount;
             booking = await bookingService.createBooking({
               ...bookingData,
+              status: 'confirmed',
               payment: {
                 method: 'credit_card',
-                amount: session.amount_total / 100,
+                amount: chargedAmount,
                 status: 'completed',
                 stripeSessionId: session.id,
                 stripeCustomerId: session.customer,

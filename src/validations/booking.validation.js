@@ -69,7 +69,7 @@ const createBooking = {
       .optional(),
     payment: Joi.object()
       .keys({
-        method: Joi.string().valid('credit_card', 'paypal').required(),
+        method: Joi.string().valid('credit_card', 'paypal', 'cash').required(),
         status: Joi.string().valid('pending', 'completed', 'failed').default('pending'),
         amount: Joi.number().required(),
         currency: Joi.string().default('USD'),
@@ -144,7 +144,7 @@ const updateBooking = {
         })
       ),
       payment: Joi.object().keys({
-        method: Joi.string().valid('credit_card', 'paypal'),
+        method: Joi.string().valid('credit_card', 'paypal', 'cash'),
         status: Joi.string().valid('pending', 'completed', 'failed'),
         amount: Joi.number(),
         stripePaymentIntentId: Joi.string().allow(''),
