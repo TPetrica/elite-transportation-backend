@@ -484,7 +484,7 @@ const viewEmailInvoice = catchAsync(async (req, res) => {
     
     // Add night fee if applicable
     if (booking.pricing?.nightFee > 0) {
-      const nightFeePerTrip = 20; // Night fee is $20 per trip
+      const nightFeePerTrip = 30; // Night fee is $30 per trip
       const nightFeeCount = booking.pricing.nightFee / nightFeePerTrip;
       
       if (nightFeeCount === 1) {
@@ -660,7 +660,7 @@ const getInvoiceByBookingNumber = catchAsync(async (req, res) => {
     
     // Add night fee if applicable
     if (booking.pricing?.nightFee > 0) {
-      const nightFeePerTrip = 20;
+      const nightFeePerTrip = 30;
       const nightFeeCount = booking.pricing.nightFee / nightFeePerTrip;
       
       if (nightFeeCount === 1) {

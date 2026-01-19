@@ -31,7 +31,7 @@ const createAffiliate = {
       isCustom: Joi.boolean().optional(),
       isCottonwood: Joi.boolean().optional(),
     }).allow(null).optional(),
-    preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+    preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way', 'local-rides'),
     servicePricing: Joi.object({
       basePrice: Joi.number().min(0),
       minPassengers: Joi.number().min(0).default(0),
@@ -39,7 +39,7 @@ const createAffiliate = {
     }),
     servicePricingList: Joi.array().items(
       Joi.object({
-        serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+        serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way', 'local-rides'),
         basePrice: Joi.number().min(0),
         minPassengers: Joi.number().min(0).default(0),
         customDescription: Joi.string().trim().allow('').optional(),
@@ -118,7 +118,7 @@ const updateAffiliate = {
         isCustom: Joi.boolean().optional(),
         isCottonwood: Joi.boolean().optional(),
       }).allow(null).optional(),
-      preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+      preferredService: Joi.string().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way', 'local-rides'),
       servicePricing: Joi.object({
         basePrice: Joi.number().min(0),
         minPassengers: Joi.number().min(0).default(0),
@@ -126,7 +126,7 @@ const updateAffiliate = {
       }),
       servicePricingList: Joi.array().items(
         Joi.object({
-          serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'),
+          serviceType: Joi.string().required().valid('from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way', 'local-rides'),
           basePrice: Joi.number().min(0),
           minPassengers: Joi.number().min(0).default(0),
           customDescription: Joi.string().trim().allow('').optional(),

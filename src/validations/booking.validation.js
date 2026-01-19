@@ -45,7 +45,7 @@ const createBooking = {
       .optional(),
     duration: Joi.string().allow('').optional(),
     service: Joi.string()
-      .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
+      .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons', 'local-rides')
       .required(),
     passengerDetails: Joi.object()
       .keys({
@@ -103,7 +103,7 @@ const updateBooking = {
     .keys({
       status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
       service: Joi.string()
-        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons'),
+        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons', 'local-rides'),
       pickup: Joi.object().keys({
         address: Joi.string(),
         date: Joi.date(),

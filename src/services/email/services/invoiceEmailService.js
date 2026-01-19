@@ -95,7 +95,7 @@ class InvoiceEmailService extends BaseEmailService {
       // Add night fee if applicable
       if (booking.pricing?.nightFee > 0) {
         // Calculate number of night fees based on the total night fee amount
-        const nightFeePerTrip = 20; // Night fee is $20 per trip
+        const nightFeePerTrip = 30; // Night fee is $30 per trip
         const nightFeeCount = booking.pricing.nightFee / nightFeePerTrip;
         
         if (nightFeeCount === 1) {

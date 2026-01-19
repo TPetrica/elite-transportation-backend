@@ -3,6 +3,38 @@ const { Service } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
+const HOURLY_RATE_PER_HOUR = 120;
+
+const LOCAL_RIDES_SERVICE = {
+  id: 'local-rides',
+  serviceType: 'local-rides',
+  title: 'Local Rides',
+  description: 'Local transportation within Park City area (84098 & 84060 only).',
+  maxPassengers: 5,
+  basePrice: 50,
+  requiresInquiry: false,
+  isActive: true,
+  sortOrder: 15,
+  vehicle: null,
+};
+
+const applyPublicServiceOverrides = (services) => {
+  const normalized = (services || []).map((service) => (service?.toJSON ? service.toJSON() : service));
+
+  const withOverrides = normalized.map((service) => {
+    if (service?.serviceType === 'hourly') {
+      return { ...service, basePrice: HOURLY_RATE_PER_HOUR };
+    }
+    return service;
+  });
+
+  if (!withOverrides.some((s) => s?.serviceType === 'local-rides')) {
+    withOverrides.push(LOCAL_RIDES_SERVICE);
+  }
+
+  return withOverrides.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+};
+
 /**
  * Create a service
  * @param {Object} serviceBody
@@ -127,7 +159,8 @@ const deleteServiceById = async (serviceId) => {
  */
 const getActiveServices = async () => {
   try {
-    return await Service.find({ isActive: true }).sort({ sortOrder: 1 }).populate('vehicle');
+    const services = await Service.find({ isActive: true }).sort({ sortOrder: 1 }).populate('vehicle');
+    return applyPublicServiceOverrides(services);
   } catch (error) {
     logger.error('Error getting active services:', error);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to get active services');

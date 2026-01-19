@@ -2,6 +2,7 @@ const moment = require('moment-timezone');
 
 // Set timezone to Mountain Time (Utah)
 const TIMEZONE = 'America/Denver';
+const NIGHT_FEE_PER_TRIP = 30;
 
 /**
  * Format date with timezone - ensuring correct date without shifting
@@ -85,6 +86,7 @@ const getPricingBreakdownHTML = (bookingData) => {
   const hasExtras = bookingData.extras && bookingData.extras.length > 0;
   const hasNightFee = pricing.nightFee > 0;
   const hasGratuity = pricing.gratuity > 0;
+  const nightFeeCount = hasNightFee ? Math.round(pricing.nightFee / NIGHT_FEE_PER_TRIP) : 0;
   
   // Don't show pricing if no pricing data
   if (!pricing.basePrice && !hasExtras && !hasNightFee && !hasGratuity) {
@@ -112,7 +114,7 @@ const getPricingBreakdownHTML = (bookingData) => {
       }).join('') : ''}
       ${hasNightFee ? `
         <div class="price-item">
-          <span>Night Service Fee${bookingData.isRoundTrip && pricing.nightFee === 40 ? ' (x2)' : ''}</span>
+          <span>Night Service Fee${bookingData.isRoundTrip && nightFeeCount > 1 ? ` (x${nightFeeCount})` : ''}</span>
           <span>${formatPrice(pricing.nightFee)}</span>
         </div>
       ` : ''}

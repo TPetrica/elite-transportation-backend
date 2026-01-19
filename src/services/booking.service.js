@@ -11,6 +11,36 @@ const logger = require('../config/logger');
 const config = require('../config/config');
 const { normalizeTimeString } = require('../utils/timeFormat');
 
+const LOCAL_RIDES_ZIP_CODES = new Set(['84060', '84098']);
+
+const extractZipCode = (address) => {
+  if (!address) return null;
+  const match =
+    address.match(/\bUT\s+(\d{5})\b/i) ||
+    address.match(/\bUtah\s+(\d{5})\b/i) ||
+    address.match(/\b(84\d{3})\b/);
+  return match ? match[1] : null;
+};
+
+const assertValidLocalRidesAddresses = (pickupAddress, dropoffAddress) => {
+  const pickupZip = extractZipCode(pickupAddress);
+  const dropoffZip = extractZipCode(dropoffAddress);
+
+  if (!pickupZip || !dropoffZip) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Local Rides is available only within Park City zip codes 84060 and 84098.'
+    );
+  }
+
+  if (!LOCAL_RIDES_ZIP_CODES.has(pickupZip) || !LOCAL_RIDES_ZIP_CODES.has(dropoffZip)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Local Rides is available only within Park City zip codes 84060 and 84098.'
+    );
+  }
+};
+
 const createBooking = async (bookingBody) => {
   try {
     logger.info('Starting booking creation process');
@@ -46,6 +76,10 @@ const createBooking = async (bookingBody) => {
       logger.info('Frontend date ISO:', new Date(bookingBody.pickup.date).toISOString());
     }
     logger.info('==============================');
+
+    if (bookingBody.service === 'local-rides') {
+      assertValidLocalRidesAddresses(bookingBody.pickup?.address, bookingBody.dropoff?.address);
+    }
 
     if (bookingBody.extras?.length) {
       const extraIds = bookingBody.extras.map((extra) => extra.item);

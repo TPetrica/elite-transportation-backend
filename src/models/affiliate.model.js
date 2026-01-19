@@ -91,7 +91,7 @@ const affiliateSchema = mongoose.Schema(
     },
     preferredService: {
       type: String,
-      enum: ['from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group'],
+      enum: ['from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'local-rides'],
     },
     // Custom service pricing for affiliates (deprecated - kept for backward compatibility)
     servicePricing: {
@@ -114,7 +114,7 @@ const affiliateSchema = mongoose.Schema(
       serviceType: {
         type: String,
         required: true,
-        enum: ['from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way'],
+        enum: ['from-airport', 'to-airport', 'hourly', 'per-person', 'canyons', 'round-trip', 'group', 'one-way', 'local-rides'],
       },
       basePrice: {
         type: Number,

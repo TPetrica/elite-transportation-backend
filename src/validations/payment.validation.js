@@ -45,7 +45,7 @@ const createCheckoutSession = {
       }).allow(null).optional(),
       duration: Joi.string().allow('', null).optional(),
       service: Joi.string()
-        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons')
+        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons', 'local-rides')
         .required(),
       passengerDetails: Joi.object({
         firstName: Joi.string().required(),
@@ -123,7 +123,34 @@ const getSession = {
   }),
 };
 
+const chargeCashGuarantee = {
+  body: Joi.object().keys({
+    bookingId: Joi.string().required(),
+    amount: Joi.number().positive().required(),
+    authorizeOnly: Joi.boolean().default(false),
+    idempotencyKey: Joi.string().optional(),
+  }),
+};
+
+const captureCashGuarantee = {
+  body: Joi.object().keys({
+    bookingId: Joi.string().required(),
+    amount: Joi.number().positive().optional(),
+    idempotencyKey: Joi.string().optional(),
+  }),
+};
+
+const cancelCashGuarantee = {
+  body: Joi.object().keys({
+    bookingId: Joi.string().required(),
+    idempotencyKey: Joi.string().optional(),
+  }),
+};
+
 module.exports = {
   createCheckoutSession,
+  chargeCashGuarantee,
+  captureCashGuarantee,
+  cancelCashGuarantee,
   getSession,
 };
