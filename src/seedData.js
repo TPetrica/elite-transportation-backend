@@ -143,7 +143,7 @@ const extras = [
   {
     name: 'Airport Meet & Greet',
     description: 'Professional greeting service at the airport with name board',
-    price: 50.0,
+    price: 45.0,
     currency: 'USD',
     type: 'selection',
     category: 'service',

@@ -8,6 +8,65 @@ const {
   getExtrasListHTML 
 } = require('./emailUtils');
 
+const getMeetAndGreetInstructions = () => `
+<div class="airport-instructions">
+  <h4>🤝 Meet & Greet Experience</h4>
+
+  <div class="step">
+    <div class="step-icon">👋</div>
+    <div class="step-content">
+      <div class="step-title">Personal Welcome</div>
+      <p>Upon exiting the terminal, you will be personally welcomed by an Elite Transportation representative.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-icon">📱</div>
+    <div class="step-content">
+      <div class="step-title">Easy Identification</div>
+      <p>Your chauffeur will be holding a tablet displaying your name, along with the Elite Transportation name and logo, for easy identification.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-icon">🛒</div>
+    <div class="step-content">
+      <div class="step-title">Luggage Cart Provided</div>
+      <p>A luggage cart will be provided for your convenience.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-icon">🧳</div>
+    <div class="step-content">
+      <div class="step-title">Baggage Claim Escort</div>
+      <p>After greeting you, your chauffeur will escort you to baggage claim, where luggage will be retrieved together before proceeding to your vehicle.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-icon">💼</div>
+    <div class="step-content">
+      <div class="step-title">Luggage Assistance</div>
+      <p>Your chauffeur will assist with luggage handling and transport to the vehicle.</p>
+      <p style="margin-top: 10px; font-size: 0.9em; color: #666;">While every effort is made to provide seamless service, guests must be able to assist with their luggage, particularly when traveling with multiple or oversized items such as skis or large suitcases.</p>
+    </div>
+  </div>
+
+  <div class="contact-info">
+    <p><strong>📱 Need assistance?</strong> Call or text us at <a href="tel:4359019158">(435) 901-9158</a></p>
+  </div>
+</div>
+`;
+
+const hasMeetAndGreetExtra = (extras) => {
+  if (!extras || !Array.isArray(extras)) return false;
+  return extras.some(extra =>
+    extra.name && extra.name.toLowerCase().includes('meet') &&
+    extra.name.toLowerCase().includes('greet')
+  );
+};
+
 const getFromAirportInstructions = () => `
 <div class="airport-instructions">
   <h4>🛬 Airport Pickup Instructions</h4>
@@ -148,8 +207,8 @@ const getFromAirportTemplate = (bookingData) => {
         </div>
       </div>
       
-      ${getFromAirportInstructions()}
-      
+      ${hasMeetAndGreetExtra(bookingData.extras) ? getMeetAndGreetInstructions() : getFromAirportInstructions()}
+
       ${getReturnTripHTML(bookingData.returnDetails)}
       
       ${getPricingBreakdownHTML(bookingData)}
