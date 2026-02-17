@@ -1,4 +1,4 @@
-const moment = require('moment');
+const moment = require('moment-timezone');
 const httpStatus = require('http-status');
 const { Schedule, DateException, ManualBooking } = require('../models');
 const Booking = require('../models/booking.model');
@@ -11,7 +11,46 @@ const {
   normalizeTimeString,
 } = require('../utils/timeFormat');
 
+const BOOKING_TIMEZONE = 'America/Denver';
+
 class AvailabilityService {
+  parseDateInBookingTimezone(date) {
+    if (moment.isMoment(date)) {
+      return moment.tz(date.format('YYYY-MM-DD'), 'YYYY-MM-DD', true, BOOKING_TIMEZONE);
+    }
+
+    if (typeof date === 'string') {
+      const trimmedDate = date.trim();
+      const datePartMatch = trimmedDate.match(/^(\d{4}-\d{2}-\d{2})/);
+
+      if (datePartMatch) {
+        return moment.tz(datePartMatch[1], 'YYYY-MM-DD', true, BOOKING_TIMEZONE);
+      }
+
+      const fallbackParsedDate = moment(trimmedDate);
+      if (fallbackParsedDate.isValid()) {
+        return moment.tz(fallbackParsedDate.format('YYYY-MM-DD'), 'YYYY-MM-DD', true, BOOKING_TIMEZONE);
+      }
+
+      return moment.invalid();
+    }
+
+    const fallbackParsedDate = moment(date);
+    if (fallbackParsedDate.isValid()) {
+      return moment.tz(fallbackParsedDate.format('YYYY-MM-DD'), 'YYYY-MM-DD', true, BOOKING_TIMEZONE);
+    }
+
+    return moment.invalid();
+  }
+
+  getNowInBookingTimezone() {
+    return moment.tz(BOOKING_TIMEZONE);
+  }
+
+  getSlotDateTime(requestedDate, time) {
+    return moment.tz(`${requestedDate.format('YYYY-MM-DD')} ${time}`, 'YYYY-MM-DD HH:mm', true, BOOKING_TIMEZONE);
+  }
+
   timeToMinutes(time) {
     const minutes = timeStringToMinutes(time);
     if (minutes === null) {
@@ -100,18 +139,21 @@ class AvailabilityService {
 
   // Check if date has an exception
   async getDateException(date) {
-    const requestedDate = moment(date).startOf('day');
+    const requestedDate = this.parseDateInBookingTimezone(date);
+    const startOfRequestedDay = requestedDate.clone().startOf('day');
+    const endOfRequestedDay = requestedDate.clone().add(1, 'day').startOf('day');
+
     return DateException.findOne({
       date: {
-        $gte: requestedDate.toDate(),
-        $lt: requestedDate.clone().add(1, 'day').toDate(),
+        $gte: startOfRequestedDay.toDate(),
+        $lt: endOfRequestedDay.toDate(),
       },
     });
   }
 
   async getAvailableTimeSlots(date, excludeBookingId = null) {
     try {
-      const requestedDate = moment(date);
+      const requestedDate = this.parseDateInBookingTimezone(date);
       logger.info(`Processing available time slots for date: ${requestedDate.format('YYYY-MM-DD')}`);
 
       if (!requestedDate.isValid()) {
@@ -186,8 +228,8 @@ class AvailabilityService {
     const allSlots = this.generateTimeSlots();
 
     // Get existing bookings for the day
-    const startOfDay = requestedDate.startOf('day').toDate();
-    const endOfDay = requestedDate.endOf('day').toDate();
+    const startOfDay = requestedDate.clone().startOf('day').toDate();
+    const endOfDay = requestedDate.clone().endOf('day').toDate();
 
     const query = {
       'pickup.date': {
@@ -258,6 +300,9 @@ class AvailabilityService {
     // Filter available slots
     const allowOverlappingBookings = config.booking?.allowOverlappingBookings;
     const availableSlots = [];
+    const nowInBookingTimezone = this.getNowInBookingTimezone();
+    const isRequestedDayToday = requestedDate.isSame(nowInBookingTimezone, 'day');
+    const twoHourBuffer = nowInBookingTimezone.clone().add(2, 'hours');
 
     for (const time of allSlots) {
       // Check if within schedule
@@ -284,9 +329,8 @@ class AvailabilityService {
       const isBlockedForAvailability = !allowOverlappingBookings && isBlocked;
 
       // Check if in past (with 2 hour buffer)
-      const isInPast =
-        requestedDate.isSame(moment(), 'day') &&
-        moment(`${requestedDate.format('YYYY-MM-DD')} ${time}`).isSameOrBefore(moment().add(2, 'hours'));
+      const slotDateTime = this.getSlotDateTime(requestedDate, time);
+      const isInPast = isRequestedDayToday && slotDateTime.isSameOrBefore(twoHourBuffer);
 
       // Only add to available slots if all conditions are met
       if (isWithinSchedule && !isBlockedForAvailability && !isInPast) {
@@ -317,7 +361,7 @@ class AvailabilityService {
         return false;
       }
 
-      const requestedDate = moment(date);
+      const requestedDate = this.parseDateInBookingTimezone(date);
       logger.info(
         `Checking availability for date: ${requestedDate.format('YYYY-MM-DD')}, time: ${normalizedTime}, excludeBookingId: ${
           excludeBookingId || 'none'
@@ -404,8 +448,8 @@ class AvailabilityService {
       }
 
       // Check existing bookings
-      const startOfDay = requestedDate.startOf('day').toDate();
-      const endOfDay = requestedDate.endOf('day').toDate();
+      const startOfDay = requestedDate.clone().startOf('day').toDate();
+      const endOfDay = requestedDate.clone().endOf('day').toDate();
 
       const query = {
         'pickup.date': {
@@ -451,8 +495,11 @@ class AvailabilityService {
       }
 
       // Check if time is in the past
-      const slotTime = moment(`${requestedDate.format('YYYY-MM-DD')} ${normalizedTime}`);
-      const isPastTime = slotTime.isSameOrBefore(moment().add(2, 'hours'));
+      const nowInBookingTimezone = this.getNowInBookingTimezone();
+      const slotTime = this.getSlotDateTime(requestedDate, normalizedTime);
+      const isPastTime =
+        requestedDate.isSame(nowInBookingTimezone, 'day') &&
+        slotTime.isSameOrBefore(nowInBookingTimezone.clone().add(2, 'hours'));
 
       const isAvailable = !isPastTime;
       logger.debug(`Time slot ${normalizedTime} availability check result:`, { isAvailable });

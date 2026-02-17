@@ -1,6 +1,8 @@
 const Joi = require('joi');
 const { objectId } = require('./custom.validation');
 
+const bookingDate = Joi.alternatives().try(Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/), Joi.string().isoDate());
+
 /**
  * Validation schema for creating a booking
  */
@@ -12,7 +14,7 @@ const createBooking = {
     pickup: Joi.object()
       .keys({
         address: Joi.string().required(),
-        date: Joi.date().required(),
+        date: bookingDate.required(),
         time: Joi.string().required(),
         flightNumber: Joi.string().allow('').optional(),
         flightTime: Joi.string().allow('').optional(),
@@ -102,11 +104,19 @@ const updateBooking = {
   body: Joi.object()
     .keys({
       status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
-      service: Joi.string()
-        .valid('to-airport', 'from-airport', 'round-trip', 'hourly', 'group', 'per-person', 'canyons', 'local-rides'),
+      service: Joi.string().valid(
+        'to-airport',
+        'from-airport',
+        'round-trip',
+        'hourly',
+        'group',
+        'per-person',
+        'canyons',
+        'local-rides'
+      ),
       pickup: Joi.object().keys({
         address: Joi.string(),
-        date: Joi.date(),
+        date: bookingDate,
         time: Joi.string(),
         flightNumber: Joi.string().allow(''),
         flightTime: Joi.string().allow(''),
