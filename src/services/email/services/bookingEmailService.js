@@ -2,7 +2,6 @@ const BaseEmailService = require('./baseEmailService');
 const { getBookingConfirmationTemplate, getServiceName } = require('../templates/booking');
 const moment = require('moment');
 const logger = require('../../../config/logger');
-const config = require('../../../config/config');
 
 class BookingEmailService extends BaseEmailService {
   /**
@@ -81,26 +80,11 @@ class BookingEmailService extends BaseEmailService {
 
       const subject = `${subjectPrefix}Booking Confirmation - #${bookingData.bookingNumber}`;
 
-      // Collect all recipients for parallel sending
-      const allRecipients = [to]; // Customer first
-      
-      // Admin email
-      if (config.email.from) {
-        allRecipients.push(config.email.from);
-      }
-
-      // Affiliate email for PCH bookings
-      if (bookingData.affiliate === true && bookingData.affiliateCode === 'PCH') {
-        allRecipients.push('parkcityhostel@gmail.com');
-      }
-
-      // Send to all recipients in parallel
-      await this.sendToMultipleRecipients(allRecipients, subject, text, html);
+      await this.sendEmail(to, subject, text, html);
 
       logger.info('Booking confirmation emails sent successfully:', {
         to,
         bookingNumber: bookingData.bookingNumber,
-        additionalRecipients: allRecipients.length - 1, // -1 because first recipient is the customer
       });
     } catch (error) {
       logger.error('Error sending booking confirmation emails:', {

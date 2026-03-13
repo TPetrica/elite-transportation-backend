@@ -37,7 +37,12 @@ const healthCheck = async () => {
 };
 
 // Run health check every 30 seconds
-setInterval(healthCheck, 30000);
+if (config.env === 'production' && process.env.SERVER_URL && config.clientUrl) {
+  const healthInterval = setInterval(healthCheck, 30000);
+  if (typeof healthInterval.unref === 'function') {
+    healthInterval.unref();
+  }
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -113,7 +118,9 @@ app.use((req, res, next) => {
 app.use(errorConverter);
 app.use(errorHandler);
 
-// Start health check immediately
-healthCheck();
+// Start health check immediately only in production when external URLs are configured
+if (config.env === 'production' && process.env.SERVER_URL && config.clientUrl) {
+  healthCheck();
+}
 
 module.exports = app;

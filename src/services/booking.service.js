@@ -44,7 +44,6 @@ const assertValidLocalRidesAddresses = (pickupAddress, dropoffAddress) => {
 const createBooking = async (bookingBody) => {
   try {
     logger.info('Starting booking creation process');
-    console.log('bookingBody', bookingBody)
     
     // Sanitize fields that might come as empty strings from frontend
     if (bookingBody.duration === '') {
@@ -166,9 +165,6 @@ const createBooking = async (bookingBody) => {
     }
 
     try {
-      
-      console.log('booking SERVICE', booking)
-
       const emailData = {
         bookingNumber: booking.bookingNumber,
         amount: booking.payment.amount,
@@ -241,7 +237,6 @@ const createBooking = async (bookingBody) => {
       };
 
       // Send email to customer
-      console.log('emailData SERVICE', emailData)
       await emailService.sendBookingConfirmationEmail(booking.email, emailData);
       logger.info('Booking confirmation email sent to customer');
       
@@ -569,6 +564,16 @@ const attachUserToBooking = async (bookingNumber, userId) => {
     const user = await User.findById(userId);
     if (!user) {
       throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+    }
+
+    const bookingEmail = (booking.email || booking.passengerDetails?.email || '').trim().toLowerCase();
+    const userEmail = (user.email || '').trim().toLowerCase();
+
+    if (!bookingEmail || bookingEmail !== userEmail) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Booking email must match the authenticated account before it can be attached'
+      );
     }
 
     booking.user = userId;

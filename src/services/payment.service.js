@@ -4,6 +4,7 @@ const Payment = require('../models/payment.model');
 const Booking = require('../models/booking.model');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const { ACCESS_PURPOSES, generateBookingAccessToken } = require('../utils/bookingAccess');
 
 const createPayment = async (paymentData) => {
   try {
@@ -95,6 +96,7 @@ const getSessionById = async (sessionId) => {
         passengerDetails: payment.booking.passengerDetails,
         isRoundTrip: payment.booking.isRoundTrip || false,
         returnDetails: payment.booking.returnDetails || null,
+        accessToken: generateBookingAccessToken(payment.booking, ACCESS_PURPOSES.INVOICE),
       };
     }
 

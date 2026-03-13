@@ -5,7 +5,7 @@ const path = require('path');
 
 class BaseEmailService {
   constructor() {
-    this.transport = this.createTransport();
+    this.transport = undefined;
     this.defaultAttachments = [
       {
         filename: 'logo.jpeg',
@@ -13,6 +13,15 @@ class BaseEmailService {
         cid: 'companyLogo',
       },
     ];
+  }
+
+  getTransport() {
+    if (this.transport !== undefined) {
+      return this.transport;
+    }
+
+    this.transport = this.createTransport();
+    return this.transport;
   }
 
   createTransport() {
@@ -31,11 +40,12 @@ class BaseEmailService {
         rateLimit: 10 // 10 emails per second max
       });
 
-      logger.info('SMTP Config:', config.email.smtp);
-      transport
-        .verify()
-        .then(() => logger.info('Connected to email server'))
-        .catch((err) => logger.warn('Unable to connect to email server:', err.message));
+      if (config.env !== 'test') {
+        transport
+          .verify()
+          .then(() => logger.info('Connected to email server'))
+          .catch((err) => logger.warn('Unable to connect to email server:', err.message));
+      }
 
       return transport;
     }
@@ -45,7 +55,9 @@ class BaseEmailService {
   }
 
   async sendEmail(to, subject, text, html, attachments = []) {
-    if (!this.transport) {
+    const transport = this.getTransport();
+
+    if (!transport) {
       logger.warn(`Email not sent to ${to} - SMTP not configured`);
       return;
     }
@@ -60,7 +72,7 @@ class BaseEmailService {
         attachments: [...this.defaultAttachments, ...attachments],
       };
 
-      await this.transport.sendMail(msg);
+      await transport.sendMail(msg);
       logger.info(`Email sent successfully to ${to}`);
     } catch (error) {
       logger.error('Error sending email:', error);

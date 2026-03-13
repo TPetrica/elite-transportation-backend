@@ -2,6 +2,7 @@ const BaseEmailService = require('./baseEmailService');
 const invoiceTemplate = require('../templates/invoiceTemplate');
 const logger = require('../../../config/logger');
 const config = require('../../../config/config');
+const { ACCESS_PURPOSES, generateBookingAccessToken } = require('../../../utils/bookingAccess');
 
 class InvoiceEmailService extends BaseEmailService {
   /**
@@ -163,6 +164,9 @@ class InvoiceEmailService extends BaseEmailService {
         throw new Error('Failed to generate invoice HTML');
       }
 
+      const invoiceAccessToken = generateBookingAccessToken(booking, ACCESS_PURPOSES.INVOICE);
+      const invoiceUrl = `${config.clientUrl.replace(/\/$/, '')}/invoice/${booking.bookingNumber}?accessToken=${encodeURIComponent(invoiceAccessToken)}`;
+
       const text = `
 ELITE TRANSPORTATION Invoice #${booking.bookingNumber}
 
@@ -183,17 +187,30 @@ Customer Details:
 
 ${booking.passengerDetails.notes ? `Special Instructions: ${booking.passengerDetails.notes}\n` : ''}
 
+View Invoice Online: ${invoiceUrl}
+
 Thank you for choosing ELITE TRANSPORTATION!
       `;
+
+      const invoiceLinkBlock = `
+        <div style="padding-top: 20px; font-family: Arial, sans-serif;">
+          <p style="margin: 0;">
+            <a href="${invoiceUrl}" style="color: #2563eb; text-decoration: none;">View this invoice online</a>
+          </p>
+        </div>
+      `;
+      const htmlWithLink = html.includes('</body>')
+        ? html.replace('</body>', `${invoiceLinkBlock}</body>`)
+        : `${html}${invoiceLinkBlock}`;
 
       const customerSubject = `ELITE TRANSPORTATION Invoice #${booking.bookingNumber}`;
       const ownerSubject = `Invoice Copy - Booking #${booking.bookingNumber}`;
 
       // Send to customer
-      await this.sendEmail(to, customerSubject, text, html);
+      await this.sendEmail(to, customerSubject, text, htmlWithLink);
 
       // Send copy to business owner
-      await this.sendEmail(config.email.from, ownerSubject, text, html);
+      await this.sendEmail(config.email.from, ownerSubject, text, htmlWithLink);
 
       logger.info('Invoice emails sent successfully:', {
         to,

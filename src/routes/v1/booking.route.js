@@ -1,5 +1,6 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
+const optionalAuth = require('../../middlewares/optionalAuth');
 const validate = require('../../middlewares/validate');
 const bookingValidation = require('../../validations/booking.validation');
 const bookingController = require('../../controllers/booking.controller');
@@ -8,10 +9,20 @@ const router = express.Router();
 
 // Public routes
 router.post('/', validate(bookingValidation.createBooking), bookingController.createBooking);
-router.get('/number/:bookingNumber', validate(bookingValidation.getBookingByNumber), bookingController.getBookingByNumber);
+router.get(
+  '/number/:bookingNumber',
+  optionalAuth(),
+  validate(bookingValidation.getBookingByNumber),
+  bookingController.getBookingByNumber
+);
 
-// Public invoice route - accessible by booking number
-router.get('/invoice/:bookingNumber', validate(bookingValidation.getBookingByNumber), bookingController.getInvoiceByBookingNumber);
+// Tokenized public invoice route with optional authenticated access
+router.get(
+  '/invoice/:bookingNumber',
+  optionalAuth(),
+  validate(bookingValidation.getBookingByNumber),
+  bookingController.getInvoiceByBookingNumber
+);
 
 // Protected routes - require authentication
 router.route('/').get(auth(), validate(bookingValidation.getBookings), bookingController.getBookings);
@@ -64,6 +75,11 @@ router.post(
 router.get('/user/bookings', auth(), validate(bookingValidation.getUserBookings), bookingController.getUserBookings);
 
 // View email invoice template
-router.get('/:bookingId/email-invoice', validate(bookingValidation.getBooking), bookingController.viewEmailInvoice);
+router.get(
+  '/:bookingId/email-invoice',
+  auth('manageBookings'),
+  validate(bookingValidation.getBooking),
+  bookingController.viewEmailInvoice
+);
 
 module.exports = router;

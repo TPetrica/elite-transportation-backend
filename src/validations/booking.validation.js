@@ -180,6 +180,9 @@ const getBookingByNumber = {
   params: Joi.object().keys({
     bookingNumber: Joi.string().required(),
   }),
+  query: Joi.object().keys({
+    accessToken: Joi.string().optional(),
+  }),
 };
 
 /**

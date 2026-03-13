@@ -6,14 +6,23 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const { Payment, Booking } = require('../models');
+const {
+  canAccessPaymentSessionWithToken,
+  generatePaymentSessionAccessToken,
+} = require('../utils/bookingAccess');
+
+const getBookingUserId = (booking) => {
+  if (!booking?.user) return null;
+  if (typeof booking.user === 'string') return booking.user;
+  if (booking.user._id) return booking.user._id.toString();
+  if (booking.user.id) return booking.user.id.toString();
+  return booking.user.toString();
+};
 
 const createCheckoutSession = catchAsync(async (req, res) => {
   const { amount, billingDetails, bookingData, paymentMethod = 'card' } = req.body;
   const isCash = paymentMethod === 'cash';
 
-  console.log('amount', amount)
-  console.log('billingDetails', billingDetails)
-  console.log('bookingData hereee', bookingData)
   try {
     // Create Stripe Customer first
     const customer = await stripe.customers.create({
@@ -60,6 +69,9 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       },
     });
 
+    const paymentAccessToken = generatePaymentSessionAccessToken(tempPayment);
+    const successUrl = `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}&accessToken=${encodeURIComponent(paymentAccessToken)}`;
+
     if (isCash) {
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
@@ -70,7 +82,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
         },
         payment_method_types: ['card'],
         mode: 'setup',
-        success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: successUrl,
         cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
         setup_intent_data: {
           metadata: {
@@ -96,6 +108,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       return res.json({
         url: session.url,
         sessionId: session.id,
+        accessToken: paymentAccessToken,
       });
     }
 
@@ -180,7 +193,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: successUrl,
       cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3001'}/booking`,
       // Enable automatic invoice creation
       invoice_creation: {
@@ -235,6 +248,7 @@ const createCheckoutSession = catchAsync(async (req, res) => {
     return res.json({
       url: session.url,
       sessionId: session.id,
+      accessToken: paymentAccessToken,
     });
   } catch (error) {
     logger.error('Checkout session creation failed:', {
@@ -338,12 +352,10 @@ const handleWebhook = async (req, res) => {
               });
 
               await Payment.findByIdAndUpdate(payment._id, {
-                status: 'failed',
                 'metadata.bookingCreationFailed': true,
                 'metadata.bookingError': bookingError.message,
               });
-
-              booking = null;
+              throw bookingError;
             }
 
             if (booking) {
@@ -420,16 +432,11 @@ const handleWebhook = async (req, res) => {
               paymentId: payment._id,
             });
             
-            // Update payment as completed even if booking failed
             await Payment.findByIdAndUpdate(payment._id, {
-              status: 'completed',
-              stripePaymentIntentId: session.payment_intent,
               'metadata.bookingCreationFailed': true,
               'metadata.bookingError': bookingError.message,
             });
-            
-            // Continue workflow - don't throw error
-            booking = null;
+            throw bookingError;
           }
 
           // Get the automatically created invoice from the session
@@ -611,6 +618,21 @@ const handleWebhook = async (req, res) => {
 };
 
 const getSession = catchAsync(async (req, res) => {
+  const payment = await Payment.findOne({ stripeSessionId: req.params.sessionId }).populate('booking');
+
+  if (!payment) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Payment not found');
+  }
+
+  const bookingUserId = getBookingUserId(payment.booking);
+  const isAdmin = req.user?.role === 'admin';
+  const isOwner = !!(req.user?.id && bookingUserId && bookingUserId === req.user.id);
+  const hasToken = canAccessPaymentSessionWithToken(req.query?.accessToken, payment);
+
+  if (!isAdmin && !isOwner && !hasToken) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Forbidden');
+  }
+
   const session = await paymentService.getSessionById(req.params.sessionId);
   logger.debug('Retrieving session:', {
     sessionId: req.params.sessionId,

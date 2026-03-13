@@ -5,6 +5,26 @@ const emailService = require('../services/email/emailService');
 const ApiError = require('../utils/ApiError');
 const pick = require('../utils/pick');
 const logger = require('../config/logger');
+const { ACCESS_PURPOSES, canAccessBookingWithToken } = require('../utils/bookingAccess');
+
+const getBookingUserId = (booking) => {
+  if (!booking?.user) return null;
+  if (typeof booking.user === 'string') return booking.user;
+  if (booking.user._id) return booking.user._id.toString();
+  if (booking.user.id) return booking.user.id.toString();
+  return booking.user.toString();
+};
+
+const assertBookingAccess = (req, booking, purpose) => {
+  const bookingUserId = getBookingUserId(booking);
+  const isAdmin = req.user?.role === 'admin';
+  const isOwner = !!(req.user?.id && bookingUserId && bookingUserId === req.user.id);
+  const hasToken = canAccessBookingWithToken(req.query?.accessToken, booking, purpose);
+
+  if (!isAdmin && !isOwner && !hasToken) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Forbidden');
+  }
+};
 
 /**
  * Create a new booking
@@ -18,28 +38,6 @@ const createBooking = catchAsync(async (req, res) => {
 
   try {
     const booking = await bookingService.createBooking(req.body);
-
-    // Send confirmation email
-    const emailData = {
-      bookingNumber: booking.bookingNumber,
-      amount: booking.payment.amount,
-      pickup: booking.pickup,
-      dropoff: booking.dropoff,
-      distance: booking.distance,
-      duration: booking.duration,
-      service: booking.service,
-      passengerDetails: {
-        ...booking.passengerDetails,
-        email: booking.email // Add email to passengerDetails for template compatibility
-      },
-      billingDetails: booking.billingDetails,
-      payment: booking.payment,
-      extras: booking.extras || [],
-      affiliate: booking.affiliate,
-    };
-
-    await emailService.sendBookingConfirmationEmail(booking.email, emailData);
-
     res.status(httpStatus.CREATED).send(booking);
   } catch (error) {
     logger.error('Error in createBooking controller:', error);
@@ -103,6 +101,9 @@ const getBookingByNumber = catchAsync(async (req, res) => {
   if (!booking) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
   }
+
+  assertBookingAccess(req, booking, ACCESS_PURPOSES.BOOKING);
+
   res.send(booking);
 });
 
@@ -565,6 +566,8 @@ const getInvoiceByBookingNumber = catchAsync(async (req, res) => {
   if (!booking) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
   }
+
+  assertBookingAccess(req, booking, ACCESS_PURPOSES.INVOICE);
 
   const customerEmail = booking.email || booking.passengerDetails?.email;
   if (!booking.payment?.stripePaymentIntentId) {

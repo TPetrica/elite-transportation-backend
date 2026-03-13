@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const optionalAuth = require('../../middlewares/optionalAuth');
 const validate = require('../../middlewares/validate');
 const paymentValidation = require('../../validations/payment.validation');
 const paymentController = require('../../controllers/payment.controller');
@@ -11,8 +12,11 @@ router.post(
   paymentController.createCheckoutSession
 );
 
-router.post('/webhook', express.raw({ type: '*/*' }), paymentController.handleWebhook);
-
-router.get('/session/:sessionId', validate(paymentValidation.getSession), paymentController.getSession);
+router.get(
+  '/session/:sessionId',
+  optionalAuth(),
+  validate(paymentValidation.getSession),
+  paymentController.getSession
+);
 
 module.exports = router;

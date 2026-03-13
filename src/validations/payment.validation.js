@@ -121,6 +121,9 @@ const getSession = {
   params: Joi.object().keys({
     sessionId: Joi.string().required(),
   }),
+  query: Joi.object().keys({
+    accessToken: Joi.string().optional(),
+  }),
 };
 
 const chargeCashGuarantee = {
