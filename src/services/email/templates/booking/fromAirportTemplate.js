@@ -5,7 +5,8 @@ const {
   getPricingBreakdownHTML, 
   getReturnTripHTML, 
   getNotesHTML,
-  getExtrasListHTML 
+  getExtrasListHTML,
+  getBookingPolicyHTML
 } = require('./emailUtils');
 
 const getMeetAndGreetInstructions = () => `
@@ -208,10 +209,12 @@ const getFromAirportTemplate = (bookingData) => {
       </div>
       
       ${hasMeetAndGreetExtra(bookingData.extras) ? getMeetAndGreetInstructions() : getFromAirportInstructions()}
-
+      
       ${getReturnTripHTML(bookingData.returnDetails)}
       
       ${getPricingBreakdownHTML(bookingData)}
+
+      ${getBookingPolicyHTML()}
     </div>
     <div class="footer">
       <strong>Thank you for choosing Elite Transportation</strong><br>

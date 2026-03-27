@@ -5,7 +5,8 @@ const {
   getPricingBreakdownHTML, 
   getReturnTripHTML, 
   getNotesHTML,
-  getExtrasListHTML 
+  getExtrasListHTML,
+  getBookingPolicyHTML
 } = require('./emailUtils');
 
 const getToAirportInstructions = () => `
@@ -75,6 +76,8 @@ const getToAirportTemplate = (bookingData) => {
       ${getReturnTripHTML(bookingData.returnDetails)}
       
       ${getPricingBreakdownHTML(bookingData)}
+
+      ${getBookingPolicyHTML()}
     </div>
     <div class="footer">
       <strong>Thank you for choosing Elite Transportation</strong><br>

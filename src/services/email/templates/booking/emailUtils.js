@@ -3,6 +3,7 @@ const moment = require('moment-timezone');
 // Set timezone to Mountain Time (Utah)
 const TIMEZONE = 'America/Denver';
 const NIGHT_FEE_PER_TRIP = 30;
+const POLICY_EFFECTIVE_DATE = 'March 27, 2026';
 
 /**
  * Format date with timezone - ensuring correct date without shifting
@@ -173,6 +174,37 @@ const getNotesHTML = (notes) => {
   `;
 };
 
+const getBookingPolicyHTML = () => `
+  <div class="policy-section">
+    <h4>Cancellation Policy</h4>
+    <p class="policy-effective-date"><strong>Effective Date:</strong> ${POLICY_EFFECTIVE_DATE}</p>
+    <ul>
+      <li>Cancellations made more than 96 hours before the trip qualify for a full refund.</li>
+      <li>Cancellations made between 48 and 96 hours before the trip qualify for a 50% refund.</li>
+      <li>Cancellations made within 48 hours of the trip are non-refundable.</li>
+      <li>Same-day reservations are subject to a 100% cancellation fee.</li>
+    </ul>
+    <h4>Change Policy</h4>
+    <ul>
+      <li>Changes to a reservation are allowed up to 48 hours in advance of the scheduled pick-up time.</li>
+      <li>Changes requested within 48 hours of the trip require a new reservation.</li>
+    </ul>
+  </div>
+`;
+
+const getBookingPolicyText = () => `
+Cancellation Policy
+Effective Date: ${POLICY_EFFECTIVE_DATE}
+- Cancellations made more than 96 hours before the trip qualify for a full refund.
+- Cancellations made between 48 and 96 hours before the trip qualify for a 50% refund.
+- Cancellations made within 48 hours of the trip are non-refundable.
+- Same-day reservations are subject to a 100% cancellation fee.
+
+Change Policy
+- Changes to a reservation are allowed up to 48 hours in advance of the scheduled pick-up time.
+- Changes requested within 48 hours of the trip require a new reservation.
+`;
+
 module.exports = {
   formatDate,
   formatPrice,
@@ -181,5 +213,8 @@ module.exports = {
   getPricingBreakdownHTML,
   getReturnTripHTML,
   getNotesHTML,
+  getBookingPolicyHTML,
+  getBookingPolicyText,
+  POLICY_EFFECTIVE_DATE,
   TIMEZONE
 };

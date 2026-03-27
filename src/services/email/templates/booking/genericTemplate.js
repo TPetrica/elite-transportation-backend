@@ -5,7 +5,8 @@ const {
   getPricingBreakdownHTML, 
   getReturnTripHTML, 
   getNotesHTML,
-  getExtrasListHTML 
+  getExtrasListHTML,
+  getBookingPolicyHTML
 } = require('./emailUtils');
 
 const getServiceName = (service) => {
@@ -92,6 +93,8 @@ const getGenericTemplate = (bookingData) => {
       ${getReturnTripHTML(bookingData.returnDetails)}
       
       ${getPricingBreakdownHTML(bookingData)}
+
+      ${getBookingPolicyHTML()}
     </div>
     <div class="footer">
       <strong>Need assistance?</strong><br>

@@ -223,6 +223,35 @@ const emailStyles = `
     color: #333;
     font-size: 14px;
   }
+  .policy-section {
+    background: #f8f9fa;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 30px;
+  }
+  .policy-section h4 {
+    margin: 0 0 12px;
+    color: #1a1a1a;
+    font-size: 18px;
+  }
+  .policy-section h4 + h4 {
+    margin-top: 20px;
+  }
+  .policy-effective-date {
+    margin: 0 0 12px;
+    color: #666;
+    font-size: 14px;
+  }
+  .policy-section ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #333;
+    font-size: 14px;
+  }
+  .policy-section li + li {
+    margin-top: 8px;
+  }
   @media (max-width: 768px) {
     .container {
       padding: 10px;

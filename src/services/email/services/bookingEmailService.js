@@ -1,5 +1,6 @@
 const BaseEmailService = require('./baseEmailService');
 const { getBookingConfirmationTemplate, getServiceName } = require('../templates/booking');
+const { getBookingPolicyText } = require('../templates/booking/emailUtils');
 const moment = require('moment');
 const logger = require('../../../config/logger');
 
@@ -76,7 +77,9 @@ class BookingEmailService extends BaseEmailService {
         bookingData.service
       )} on ${pickupDate} at ${pickupTime} has been confirmed. Pickup: ${
         bookingData.pickup.address
-      }. Thank you!`;
+      }. Thank you!
+
+${getBookingPolicyText()}`;
 
       const subject = `${subjectPrefix}Booking Confirmation - #${bookingData.bookingNumber}`;
 

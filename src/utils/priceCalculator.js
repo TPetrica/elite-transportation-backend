@@ -34,9 +34,9 @@ const calculateCancellationFee = (booking) => {
   const bookingTime = new Date(booking.pickup.date);
   const hoursUntilBooking = (bookingTime - now) / (1000 * 60 * 60);
 
-  if (hoursUntilBooking > 24) {
+  if (hoursUntilBooking > 96) {
     return 0; // Free cancellation
-  } else if (hoursUntilBooking > 12) {
+  } else if (hoursUntilBooking > 48) {
     return booking.payment.amount * 0.5; // 50% fee
   } else {
     return booking.payment.amount; // Full fee
