@@ -81,9 +81,27 @@ const getGenericTemplate = (bookingData) => {
             <div class="info-value">${bookingData.passengerDetails.passengers}</div>
           </div>
           <div class="info-row">
+            <div class="info-label">Vehicle</div>
+            <div class="info-value">${(bookingData.passengerDetails.vehicleType || 'SUV').toUpperCase()}</div>
+          </div>
+          <div class="info-row">
             <div class="info-label">Luggage</div>
             <div class="info-value">${bookingData.passengerDetails.luggage} pieces</div>
           </div>
+          <div class="info-row">
+            <div class="info-label">Checked Bags</div>
+            <div class="info-value">${bookingData.passengerDetails.checkedBags || 0}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Carry-ons</div>
+            <div class="info-value">${bookingData.passengerDetails.carryOnBags || 0}</div>
+          </div>
+          ${bookingData.passengerDetails.skiBags ? `
+          <div class="info-row">
+            <div class="info-label">Ski Equipment</div>
+            <div class="info-value">${bookingData.passengerDetails.skiBags}</div>
+          </div>
+          ` : ''}
           ${getExtrasListHTML(bookingData.extras)}
         </div>
       </div>

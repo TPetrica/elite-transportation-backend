@@ -12,6 +12,8 @@ const config = require('../config/config');
 const { normalizeTimeString } = require('../utils/timeFormat');
 
 const LOCAL_RIDES_ZIP_CODES = new Set(['84060', '84098']);
+const SEDAN_MAX_PASSENGERS = 3;
+const SEDAN_MAX_BAGS_PER_TYPE = 3;
 
 const extractZipCode = (address) => {
   if (!address) return null;
@@ -37,6 +39,48 @@ const assertValidLocalRidesAddresses = (pickupAddress, dropoffAddress) => {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Local Rides is available only within Park City zip codes 84060 and 84098.'
+    );
+  }
+};
+
+const normalizePassengerDetails = (passengerDetails = {}) => {
+  const checkedBags = Math.max(0, Number(passengerDetails.checkedBags ?? passengerDetails.luggage ?? 0) || 0);
+  const carryOnBags = Math.max(0, Number(passengerDetails.carryOnBags ?? 0) || 0);
+  const skiBags = Math.max(0, Number(passengerDetails.skiBags ?? 0) || 0);
+  const passengers = Math.max(1, Number(passengerDetails.passengers) || 1);
+  const vehicleType = passengerDetails.vehicleType === 'sedan' ? 'sedan' : 'suv';
+
+  return {
+    ...passengerDetails,
+    passengers,
+    checkedBags,
+    carryOnBags,
+    skiBags,
+    vehicleType,
+    luggage: checkedBags + carryOnBags,
+  };
+};
+
+const assertValidVehicleCapacity = (passengerDetails = {}) => {
+  if (passengerDetails.vehicleType !== 'sedan') {
+    return;
+  }
+
+  if (passengerDetails.passengers > SEDAN_MAX_PASSENGERS) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Sedan bookings allow a maximum of 3 passengers.');
+  }
+
+  if (
+    passengerDetails.checkedBags > SEDAN_MAX_BAGS_PER_TYPE ||
+    passengerDetails.carryOnBags > SEDAN_MAX_BAGS_PER_TYPE
+  ) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Sedan bookings allow a maximum of 3 checked bags and 3 carry-ons.');
+  }
+
+  if (passengerDetails.passengers >= 3 && passengerDetails.skiBags > 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Sedan bookings with 3 passengers cannot include ski equipment. Reduce passengers to 1-2 or choose SUV.'
     );
   }
 };
@@ -78,6 +122,11 @@ const createBooking = async (bookingBody) => {
 
     if (bookingBody.service === 'local-rides') {
       assertValidLocalRidesAddresses(bookingBody.pickup?.address, bookingBody.dropoff?.address);
+    }
+
+    if (bookingBody.passengerDetails) {
+      bookingBody.passengerDetails = normalizePassengerDetails(bookingBody.passengerDetails);
+      assertValidVehicleCapacity(bookingBody.passengerDetails);
     }
 
     if (bookingBody.extras?.length) {
@@ -191,6 +240,10 @@ const createBooking = async (bookingBody) => {
           phone: booking.passengerDetails.phone,
           passengers: booking.passengerDetails.passengers,
           luggage: booking.passengerDetails.luggage,
+          checkedBags: booking.passengerDetails.checkedBags || 0,
+          carryOnBags: booking.passengerDetails.carryOnBags || 0,
+          skiBags: booking.passengerDetails.skiBags || 0,
+          vehicleType: booking.passengerDetails.vehicleType || 'suv',
           email: booking.email, // Use main booking email
           notes: booking.passengerDetails.notes || '',
           specialRequirements: booking.passengerDetails.specialRequirements || '',

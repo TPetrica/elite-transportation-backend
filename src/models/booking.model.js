@@ -100,9 +100,22 @@ const bookingSchema = mongoose.Schema(
         type: Number,
         required: true,
       },
+      checkedBags: {
+        type: Number,
+        default: 0,
+      },
+      carryOnBags: {
+        type: Number,
+        default: 0,
+      },
       skiBags: {
         type: Number,
         default: 0,
+      },
+      vehicleType: {
+        type: String,
+        enum: ['sedan', 'suv'],
+        default: 'suv',
       },
       notes: {
         type: String,

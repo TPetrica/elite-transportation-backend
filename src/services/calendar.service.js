@@ -138,6 +138,9 @@ Passenger Details:
 - Phone: ${booking.passengerDetails.phone || 'N/A'}
 - Email: ${booking.email}
 - Passengers: ${booking.passengerDetails.passengers}
+- Vehicle: ${booking.passengerDetails.vehicleType || 'suv'}
+- Checked Bags: ${booking.passengerDetails.checkedBags || 0}
+- Carry-ons: ${booking.passengerDetails.carryOnBags || 0}
 - Luggage: ${booking.passengerDetails.luggage}
 - Ski Bags: ${booking.passengerDetails.skiBags || 0}
 ${
