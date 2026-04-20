@@ -55,7 +55,7 @@ const getMeetAndGreetInstructions = () => `
   </div>
 
   <div class="contact-info">
-    <p><strong>📱 Need assistance?</strong> Call or text us at <a href="tel:4359019158">(435) 901-9158</a></p>
+    <p><strong>📱 Need assistance?</strong> Call or text us at <a href="tel:4359019158">+1 435-901-9158</a></p>
   </div>
 </div>
 `;
@@ -83,7 +83,7 @@ const getFromAirportInstructions = () => `
     <div class="step-icon">⬇️</div>
     <div class="step-content">
       <div class="step-title">Proceed to the elevators located between baggage claims 7 and 8</div>
-      <p>Take them down to Level 1 – Ground Transportation.</p>
+      <p>Take them down to Level 1. Ground Transportation.</p>
     </div>
   </div>
 
@@ -127,7 +127,7 @@ const getFromAirportInstructions = () => `
   </div>
 
   <div class="contact-info">
-    <p><strong>📱 Need assistance?</strong> Call or text us at <a href="tel:4359019158">(435) 901-9158</a></p>
+    <p><strong>📱 Need assistance?</strong> Call or text us at <a href="tel:4359019158">+1 435-901-9158</a></p>
   </div>
 </div>
 `;

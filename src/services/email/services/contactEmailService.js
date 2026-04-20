@@ -124,7 +124,7 @@ This message was sent from the Elite Transportation Park City website contact fo
               <p>Thank you for contacting Elite Transportation Park City. We have received your message and will get back to you as soon as possible, typically within 24 hours.</p>
               <p>If you need immediate assistance, please don't hesitate to call us at:</p>
               <p style="text-align: center; font-size: 20px; font-weight: bold;">
-                <a href="tel:+14359019158" style="color: #e95440;">(435) 901-9158</a>
+                <a href="tel:+14359019158" style="color: #e95440;">+1 435-901-9158</a>
               </p>
               <p style="text-align: center;">
                 <a href="https://elitetransportationparkcity.com/booking" class="cta">Book Online Now</a>
@@ -144,7 +144,7 @@ Dear ${name},
 
 Thank you for contacting Elite Transportation Park City. We have received your message and will get back to you as soon as possible, typically within 24 hours.
 
-If you need immediate assistance, please don't hesitate to call us at (435) 901-9158.
+If you need immediate assistance, please don't hesitate to call us at +1 435-901-9158.
 
 Best regards,
 Elite Transportation Park City Team

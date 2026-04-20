@@ -10,10 +10,9 @@ const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const config = require('../config/config');
 const { normalizeTimeString } = require('../utils/timeFormat');
+const { formatDateOnly, getUtcDayRange, toUtcDateOnly } = require('../utils/dateOnly');
 
 const LOCAL_RIDES_ZIP_CODES = new Set(['84060', '84098']);
-const SEDAN_MAX_PASSENGERS = 3;
-const SEDAN_MAX_BAGS_PER_TYPE = 3;
 
 const extractZipCode = (address) => {
   if (!address) return null;
@@ -48,7 +47,6 @@ const normalizePassengerDetails = (passengerDetails = {}) => {
   const carryOnBags = Math.max(0, Number(passengerDetails.carryOnBags ?? 0) || 0);
   const skiBags = Math.max(0, Number(passengerDetails.skiBags ?? 0) || 0);
   const passengers = Math.max(1, Number(passengerDetails.passengers) || 1);
-  const vehicleType = passengerDetails.vehicleType === 'sedan' ? 'sedan' : 'suv';
 
   return {
     ...passengerDetails,
@@ -56,33 +54,13 @@ const normalizePassengerDetails = (passengerDetails = {}) => {
     checkedBags,
     carryOnBags,
     skiBags,
-    vehicleType,
+    vehicleType: 'suv',
     luggage: checkedBags + carryOnBags,
   };
 };
 
 const assertValidVehicleCapacity = (passengerDetails = {}) => {
-  if (passengerDetails.vehicleType !== 'sedan') {
-    return;
-  }
-
-  if (passengerDetails.passengers > SEDAN_MAX_PASSENGERS) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Sedan bookings allow a maximum of 3 passengers.');
-  }
-
-  if (
-    passengerDetails.checkedBags > SEDAN_MAX_BAGS_PER_TYPE ||
-    passengerDetails.carryOnBags > SEDAN_MAX_BAGS_PER_TYPE
-  ) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Sedan bookings allow a maximum of 3 checked bags and 3 carry-ons.');
-  }
-
-  if (passengerDetails.passengers >= 3 && passengerDetails.skiBags > 0) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Sedan bookings with 3 passengers cannot include ski equipment. Reduce passengers to 1-2 or choose SUV.'
-    );
-  }
+  return passengerDetails;
 };
 
 const createBooking = async (bookingBody) => {
@@ -115,8 +93,7 @@ const createBooking = async (bookingBody) => {
     logger.info('Frontend date type:', typeof bookingBody.pickup?.date);
     logger.info('Frontend time type:', typeof bookingBody.pickup?.time);
     if (bookingBody.pickup?.date) {
-      logger.info('Frontend date as Date object:', new Date(bookingBody.pickup.date));
-      logger.info('Frontend date ISO:', new Date(bookingBody.pickup.date).toISOString());
+      logger.info('Frontend date normalized:', formatDateOnly(bookingBody.pickup.date));
     }
     logger.info('==============================');
 
@@ -127,6 +104,14 @@ const createBooking = async (bookingBody) => {
     if (bookingBody.passengerDetails) {
       bookingBody.passengerDetails = normalizePassengerDetails(bookingBody.passengerDetails);
       assertValidVehicleCapacity(bookingBody.passengerDetails);
+    }
+
+    if (bookingBody.pickup?.date) {
+      bookingBody.pickup.date = toUtcDateOnly(bookingBody.pickup.date);
+    }
+
+    if (bookingBody.returnDetails?.date) {
+      bookingBody.returnDetails.date = toUtcDateOnly(bookingBody.returnDetails.date);
     }
 
     if (bookingBody.extras?.length) {
@@ -336,33 +321,34 @@ const processQueryFilters = (filter) => {
 
   // Process date filter
   if (queryFilter.date) {
-    const date = new Date(queryFilter.date);
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    const range = getUtcDayRange(queryFilter.date);
 
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    queryFilter['pickup.date'] = {
-      $gte: startOfDay,
-      $lte: endOfDay,
-    };
+    if (range) {
+      queryFilter['pickup.date'] = {
+        $gte: range.start,
+        $lte: range.end,
+      };
+    }
 
     delete queryFilter.date;
   }
 
   // Process date range filters
   if (queryFilter.startDate) {
-    const startDate = new Date(queryFilter.startDate);
-    if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
-    queryFilter['pickup.date'].$gte = startDate;
+    const startDate = toUtcDateOnly(queryFilter.startDate);
+    if (startDate) {
+      if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
+      queryFilter['pickup.date'].$gte = startDate;
+    }
     delete queryFilter.startDate;
   }
 
   if (queryFilter.endDate) {
-    const endDate = new Date(queryFilter.endDate);
-    if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
-    queryFilter['pickup.date'].$lte = endDate;
+    const range = getUtcDayRange(queryFilter.endDate);
+    if (range) {
+      if (!queryFilter['pickup.date']) queryFilter['pickup.date'] = {};
+      queryFilter['pickup.date'].$lte = range.end;
+    }
     delete queryFilter.endDate;
   }
 
@@ -476,16 +462,17 @@ const updateBookingById = async (bookingId, updateBody) => {
     }
 
     // Check if pickup date or time is being updated
-    const oldDate = moment(booking.pickup.date).format('YYYY-MM-DD');
+    const oldDate = formatDateOnly(booking.pickup.date);
     const oldTime = booking.pickup.time;
     
-    const newDate = updateBody.pickup?.date ? moment(updateBody.pickup.date).format('YYYY-MM-DD') : oldDate;
+    const newDate = updateBody.pickup?.date ? formatDateOnly(updateBody.pickup.date) : oldDate;
     const newTime = updateBody.pickup?.time || oldTime;
     
     const dateTimeHasChanged = oldDate !== newDate || oldTime !== newTime;
     const updatedDateTime = {};
 
     if (updateBody.pickup?.date) {
+      updateBody.pickup.date = toUtcDateOnly(updateBody.pickup.date);
       updatedDateTime.date = updateBody.pickup.date;
     }
 
@@ -526,6 +513,10 @@ const updateBookingById = async (bookingId, updateBody) => {
       updateBody.returnDetails.time = normalizedReturnTime;
     }
 
+    if (updateBody.returnDetails?.date) {
+      updateBody.returnDetails.date = toUtcDateOnly(updateBody.returnDetails.date);
+    }
+
     // If updating time/date, check if the new slot is available
     // but make an exception for the current booking's time slot
     if (dateTimeHasChanged) {
@@ -535,7 +526,7 @@ const updateBookingById = async (bookingId, updateBody) => {
       // Only check availability if the date or time has changed
       const dateChanged =
         updateBody.pickup?.date &&
-        moment(updateBody.pickup.date).format('YYYY-MM-DD') !== moment(booking.pickup.date).format('YYYY-MM-DD');
+        formatDateOnly(updateBody.pickup.date) !== formatDateOnly(booking.pickup.date);
       const timeChanged = updateBody.pickup?.time && updateBody.pickup.time !== booking.pickup.time;
 
       if (dateChanged || timeChanged) {
@@ -664,11 +655,17 @@ const getBookingStats = async (startDate, endDate) => {
     // Create date filters if provided
     const dateFilter = {};
     if (startDate) {
-      dateFilter['pickup.date'] = { $gte: new Date(startDate) };
+      const normalizedStartDate = toUtcDateOnly(startDate);
+      if (normalizedStartDate) {
+        dateFilter['pickup.date'] = { $gte: normalizedStartDate };
+      }
     }
     if (endDate) {
-      if (!dateFilter['pickup.date']) dateFilter['pickup.date'] = {};
-      dateFilter['pickup.date'].$lte = new Date(endDate);
+      const range = getUtcDayRange(endDate);
+      if (range) {
+        if (!dateFilter['pickup.date']) dateFilter['pickup.date'] = {};
+        dateFilter['pickup.date'].$lte = range.end;
+      }
     }
 
     // Get status breakdown with optional date filter

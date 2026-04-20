@@ -116,7 +116,7 @@ const getGenericTemplate = (bookingData) => {
     </div>
     <div class="footer">
       <strong>Need assistance?</strong><br>
-      Call us anytime at (435) 901-9158<br><br>
+      Call us anytime at +1 435-901-9158<br><br>
       ELITE TRANSPORTATION<br>
       elitetransportationpc@gmail.com
     </div>

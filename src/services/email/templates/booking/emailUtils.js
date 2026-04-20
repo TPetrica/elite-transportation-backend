@@ -1,4 +1,5 @@
 const moment = require('moment-timezone');
+const { formatLongDateWithOrdinal } = require('../../../../utils/dateOnly');
 
 // Set timezone to Mountain Time (Utah)
 const TIMEZONE = 'America/Denver';
@@ -9,20 +10,7 @@ const POLICY_EFFECTIVE_DATE = 'March 27, 2026';
  * Format date with timezone - ensuring correct date without shifting
  */
 const formatDate = (date) => {
-  // Parse the date as a simple date string without timezone conversion
-  const dateObj = new Date(date);
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                  'July', 'August', 'September', 'October', 'November', 'December'];
-  const day = dateObj.getUTCDate();
-  const month = months[dateObj.getUTCMonth()];
-  const year = dateObj.getUTCFullYear();
-  
-  // Add ordinal suffix
-  const suffix = ['th', 'st', 'nd', 'rd'];
-  const v = day % 100;
-  const ordinal = suffix[(v - 20) % 10] || suffix[v] || suffix[0];
-  
-  return `${month} ${day}${ordinal} ${year}`;
+  return formatLongDateWithOrdinal(date);
 };
 
 /**

@@ -1,6 +1,7 @@
 const { google } = require('googleapis');
 const moment = require('moment-timezone');
 const logger = require('../config/logger');
+const { formatDateOnly } = require('../utils/dateOnly');
 
 const CALENDAR_CREDENTIALS = {
   type: 'service_account',
@@ -75,15 +76,13 @@ class CalendarService {
       
       if (isReturn) {
         // Use return trip details
-        pickupDate = moment(booking.returnDetails.date).format('YYYY-MM-DD');
+        pickupDate = formatDateOnly(booking.returnDetails.date);
         pickupTime = booking.returnDetails.time;
         pickupAddress = booking.returnDetails.pickupAddress;
         dropoffAddress = booking.returnDetails.dropoffAddress;
       } else {
         // Use original trip details
-        // Parse date as UTC to avoid timezone shifts
-        const dateObj = new Date(booking.pickup.date);
-        pickupDate = moment.utc(dateObj).format('YYYY-MM-DD');
+        pickupDate = formatDateOnly(booking.pickup.date);
         pickupTime = booking.pickup.time;
         pickupAddress = booking.pickup.address;
         dropoffAddress = booking.dropoff.address;

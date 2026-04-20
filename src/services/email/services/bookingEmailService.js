@@ -3,6 +3,7 @@ const { getBookingConfirmationTemplate, getServiceName } = require('../templates
 const { getBookingPolicyText } = require('../templates/booking/emailUtils');
 const moment = require('moment');
 const logger = require('../../../config/logger');
+const { formatLongDateWithOrdinal } = require('../../../utils/dateOnly');
 
 class BookingEmailService extends BaseEmailService {
   /**
@@ -21,37 +22,12 @@ class BookingEmailService extends BaseEmailService {
 
       if (!bookingData) throw new Error('Booking data is required');
 
-      // Handle both string and Date object formats
-      let dateObj;
       const dateInput = bookingData.pickup.date;
-      
-      if (dateInput instanceof Date) {
-        // Already a Date object, use it directly
-        dateObj = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
-      } else if (typeof dateInput === 'string') {
-        // String format like '2025-09-25'
-        const [year, month, day] = dateInput.split('-');
-        dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      } else {
+      const pickupDate = formatLongDateWithOrdinal(dateInput);
+
+      if (!pickupDate) {
         throw new Error(`Invalid date format: ${dateInput} (type: ${typeof dateInput})`);
       }
-      
-      // Helper function for ordinal suffix
-      const getOrdinalSuffix = (day) => {
-        if (day > 3 && day < 21) return 'th';
-        switch (day % 10) {
-          case 1: return 'st';
-          case 2: return 'nd';
-          case 3: return 'rd';
-          default: return 'th';
-        }
-      };
-      
-      const pickupDate = dateObj.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      }).replace(/(\d+)/, '$1' + getOrdinalSuffix(dateObj.getDate()));
 
       // Convert time from 24-hour to 12-hour format if needed
       const timeInput = bookingData.pickup.time;
@@ -118,7 +94,7 @@ ${getBookingPolicyText()}`;
 
       let dateTimeInfo = '';
       if (updatedFields.pickup?.date) {
-        const formattedDate = moment(updatedFields.pickup.date).format('MMMM Do YYYY');
+        const formattedDate = formatLongDateWithOrdinal(updatedFields.pickup.date);
         dateTimeInfo += `New Date: ${formattedDate}\n`;
       }
       if (updatedFields.pickup?.time) {

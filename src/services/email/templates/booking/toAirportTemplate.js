@@ -17,7 +17,7 @@ const getToAirportInstructions = () => `
     <div class="step-icon">🚗</div>
     <div class="step-content">
       <div class="step-title">Your driver will arrive on time</div>
-      <p>In a black SUV, clearly marked with Elite Transportation. We recommend being ready at the front entrance or lobby 5–10 minutes before your scheduled pickup.</p>
+      <p>In a black SUV, clearly marked with Elite Transportation. We recommend being ready at the front entrance or lobby 5-10 minutes before your scheduled pickup.</p>
     </div>
   </div>
 
@@ -33,7 +33,7 @@ const getToAirportInstructions = () => `
     <div class="step-icon">📱</div>
     <div class="step-content">
       <div class="step-title">Need help locating your vehicle or have a last-minute update?</div>
-      <p>Simply contact us at <a href="tel:4359019158">(435) 901-9158</a></p>
+      <p>Simply contact us at <a href="tel:4359019158">+1 435-901-9158</a></p>
     </div>
   </div>
 </div>

@@ -527,7 +527,7 @@ const viewEmailInvoice = catchAsync(async (req, res) => {
         postCode: '84098',
         country: 'United States',
         email: config.email.from,
-        phone: '+1 (435) 901-9158',
+        phone: '+1 435-901-9158',
       },
       customer: {
         name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
@@ -705,7 +705,7 @@ const getInvoiceByBookingNumber = catchAsync(async (req, res) => {
         postCode: '84098',
         country: 'United States',
         email: config.email.from,
-        phone: '+1 (435) 901-9158',
+        phone: '+1 435-901-9158',
       },
       customer: {
         name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,

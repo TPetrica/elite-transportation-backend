@@ -3,6 +3,7 @@ const invoiceTemplate = require('../templates/invoiceTemplate');
 const logger = require('../../../config/logger');
 const config = require('../../../config/config');
 const { ACCESS_PURPOSES, generateBookingAccessToken } = require('../../../utils/bookingAccess');
+const { formatDateOnly } = require('../../../utils/dateOnly');
 
 class InvoiceEmailService extends BaseEmailService {
   /**
@@ -126,7 +127,7 @@ class InvoiceEmailService extends BaseEmailService {
       
       // Add return trip info if applicable
       const returnInfo = booking.isRoundTrip && booking.returnDetails ? 
-        `\n\nReturn Trip: ${new Date(booking.returnDetails.date).toLocaleDateString('en-US')} at ${booking.returnDetails.time}` : 
+        `\n\nReturn Trip: ${formatDateOnly(booking.returnDetails.date)} at ${booking.returnDetails.time}` : 
         '';
 
       const templateData = {
@@ -143,7 +144,7 @@ class InvoiceEmailService extends BaseEmailService {
           postCode: '84098',
           country: 'United States',
           email: config.email.from,
-          phone: '+1 (435) 901-9158',
+          phone: '+1 435-901-9158',
         },
         customer: {
           name: `${booking.passengerDetails.firstName} ${booking.passengerDetails.lastName}`,
